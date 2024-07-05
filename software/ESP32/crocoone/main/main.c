@@ -1,15 +1,12 @@
-#include "freertos/FreeRTOS.h"
-#include "esp_event.h"
-#include "esp_system.h"
+#include "wifi_controller.h"
+#include "uart_controller.h"
+#include "tasks_mannager.h"
+
+#include "esp_wifi.h"
 #include "nvs_flash.h"
 
-#include "wifi_control.h"
-#include "at_command.h"
-
-#include "string.h"
-#include "esp_wifi.h"
-
-void app_main(void) {
+void app_main(void)
+{
 	esp_err_t ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
 		ESP_ERROR_CHECK(nvs_flash_erase());
@@ -17,9 +14,11 @@ void app_main(void) {
 	}
 	ESP_ERROR_CHECK(ret);
 
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+	UART_init();
+
 	wifi_init();
-	wifi_apsta();
-    UART_init();
-	AT_init();
-	attack_init();
+
+	tasks_mannager_init();
 }

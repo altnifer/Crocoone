@@ -21,7 +21,7 @@ This project is a compact and self-contained device for analyzing and pentest va
 
 ## Hardware
 
-The main hardware features of the project are described here. EasyEDA was used to create circuit diagrams and PCBs. If you need more detailed information about the circuit or the EasyEDA source files, see the "hardware/" folder. This project is based on the STM32H750VBT6 and ESP32-WROOM microcontrollers. STM32 acts as the main microcontroller, and ESP32 is only needed to implement Wi-Fi functions. They communicate with each other via the UART interface. The device consists of two boards, the main and user boards, they are connected to each other by an FPC cable. The device is powered by a 1C 800mAh Li-Po battery, but it is recommended to use a larger capacity battery.
+The main hardware features of the project are described here. EasyEDA was used to create circuit diagrams and PCBs. If you need more detailed information about the circuit or the EasyEDA source files, see the "hardware/" folder. This project is based on the STM32H743VIT6 and ESP32-WROOM microcontrollers. STM32 acts as the main microcontroller, and ESP32 is only needed to implement Wi-Fi functions. They communicate with each other via the UART interface. The device consists of two boards, the main and user boards, they are connected to each other by an FPC cable. The device is powered by a 1C 800mAh Li-Po battery, but it is recommended to use a larger capacity battery.
 
 <p align="center">
     <img src="pictures/hardware_components.jpg" width="450">
@@ -92,9 +92,9 @@ Connect your ST-link to GPIO ([8](#main-board-description)) using the following 
 | 25 (GND) | GND |
 | 26 (3V3) | +3.3V |
 
-If you have Cube IDE setup just copy [**CROCOONE_H750**](software/STM32) folder into your Cube IDE worckspace, import the project, build it and flash the controller.
+If you have Cube IDE setup just copy [**CROCOONE_H743_BOARD**](software/STM32) folder into your Cube IDE worckspace, import the project, build it and flash the controller.
 
-Otherwise you can use [**ST-Link utility**](https://www.st.com/en/development-tools/stsw-link004.html). In ST-Link utility go to ***Target>Settings...*** and in the ***mode*** tab select the ***connect under reset*** mode. Then go to ***Target>Program...*** and in the window that appears, select the file with the firmware ([**CROCOONE_H750.bin**](software/STM32/CROCOONE_H750) or [**CROCOONE_H750.hex**](software/STM32/CROCOONE_H750)). This completes the firmware process!
+Otherwise you can use [**ST-Link utility**](https://www.st.com/en/development-tools/stsw-link004.html). In ST-Link utility go to ***Target>Settings...*** and in the ***mode*** tab select the ***connect under reset*** mode. Then go to ***Target>Program...*** and in the window that appears, select the file with the firmware ([**CROCOONE_H743_BOARD.bin**](software/STM32/CROCOONE_H743_BOARD) or [**CROCOONE_H743_BOARD.hex**](software/STM32/CROCOONE_H743_BOARD)). This completes the firmware process!
 
 
 

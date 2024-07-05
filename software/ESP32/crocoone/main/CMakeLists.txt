@@ -1,25 +1,18 @@
+# See the build system documentation in IDF programming guide
+# for more information about component CMakeLists.txt files.
+
 idf_component_register(
-    SRCS 
+    SRCS                # list the source files of this component
     "main.c"
-    "packet_sender.c"
-    "wifi_control.c"
-    "at_command.c"
-    "frame_analyzer.c"
-    "frame_analyzer_parser.c"
-    "hccapx_serializer.c"
-    "pcap_serializer.c"
-    "sniffer.c"
-    "scanner.c"
-    "uart_control.c"
     "attack_handshake.c"
     "attack_deauth.c"
     "attack_beacon.c"
-    "attacks.c"
-    "packet_monitor.c"
-    "hc22000_converter.c"
     "attack_pmkid.c"
-   
-    INCLUDE_DIRS
-    "."
+    "tasks_mannager.c"
+    "packet_monitor.c"
+    "data_converter.c"
+    INCLUDE_DIRS        # optional, add here public include directories
+    PRIV_INCLUDE_DIRS   # optional, add here private include directories
+    REQUIRES            # optional, list the public requirements (component names)
+    PRIV_REQUIRES       # optional, list the private requirements
 )
-target_link_libraries(${COMPONENT_LIB} -Wl,-zmuldefs)

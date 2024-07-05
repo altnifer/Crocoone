@@ -1,0 +1,10 @@
+CMake Error at D:/DATA/Program/ESP-IDF/tools/cmake/build.cmake:266 (message):
+  Failed to resolve component 'uart'.
+Call Stack (most recent call first):
+  D:/DATA/Program/ESP-IDF/tools/cmake/build.cmake:302 (__build_resolve_and_add_req)
+  D:/DATA/Program/ESP-IDF/tools/cmake/build.cmake:595 (__build_expand_requirements)
+  D:/DATA/Program/ESP-IDF/tools/cmake/project.cmake:464 (idf_build_process)
+  CMakeLists.txt:6 (project)
+
+
+ninja: error: rebuilding 'build.ninja': subcommand failed
