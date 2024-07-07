@@ -1,4 +1,4 @@
-# Install script for directory: D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/components/frame_analyzer
+# Install script for directory: D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/components/frame_analyzer
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

@@ -1,4 +1,4 @@
-# Install script for directory: D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/components/hccapx_serializer
+# Install script for directory: D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/components/hccapx_serializer
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

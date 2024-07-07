@@ -1,8 +1,0 @@
-[0/1] Re-running CMake...
--- ccache will be used for faster recompilation
--- Project is not inside a git repository, or git repository has no commits; will not use 'git describe' to determine PROJECT_VER.
--- Building ESP-IDF components for target esp32
--- Configuring incomplete, errors occurred!
-See also "D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/CMakeFiles/CMakeOutput.log".
-FAILED: build.ninja 
-D:\DATA\Program\Espressif\tools\cmake\3.24.0\bin\cmake.exe --regenerate-during-build -SD:\Users\nikita\Documents\Crocoone\crocoone_refactoring\ESP_crocoone -BD:\Users\nikita\Documents\Crocoone\crocoone_refactoring\ESP_crocoone\build

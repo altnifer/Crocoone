@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include "esp_event.h"
 #include "uart_controller.h"
-#include "data_converter.h"
+#include "frame_analyzer_parser.h"
 #if (ASCII_HEX_FORMAT == 1)
 #include "data_converter.h"
 #endif
@@ -24,12 +24,11 @@ static const uint16_t frame_header_len = 34;
 static char monitor_buff[MONITOR_BUFF_LEN] = {};
 static char *curr_mon_buff_p = NULL;
 static bool mon_buff_is_empty = true;
-
 static esp_timer_handle_t packet_monitor_timer_handle;
 static bool packet_monitor_run = false;
-
 static uint16_t packet_counter;
-
+static bool use_bssid_filter;
+static uint8_t bssid_filter[6];
 static bool uart_busy = false;
 
 static void timer_packet_monitor(void *arg);
@@ -37,7 +36,7 @@ static void sniffer_events_handler(void *args, esp_event_base_t event_base, int3
 void frame_header_update(uint16_t pkts, uint16_t bytes);
 
 
-bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask) {
+bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask, uint8_t *bssid) {
     if ((channel < MIN_CH || channel > MAX_CH) || (filter_bitmask < MIN_BIT_MASK_FILTER || filter_bitmask > MAX_BIT_MASK_FILTER))
         return false;
 
@@ -47,6 +46,13 @@ bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask) {
     packet_counter = 0;
     curr_mon_buff_p = monitor_buff + frame_header_len;
     mon_buff_is_empty = false;
+
+    if (bssid != NULL) {
+        memcpy(bssid_filter, bssid, 6);
+        use_bssid_filter = true;
+    } else {
+        use_bssid_filter = false;
+    }
 
     pcap_global_header_t pcap_global_header = {
         .magic_number = PCAP_MAGIC_NUMBER,
@@ -115,6 +121,9 @@ static void sniffer_events_handler(void *args, esp_event_base_t event_base, int3
         return;
 
     wifi_promiscuous_pkt_t *frame = (wifi_promiscuous_pkt_t *) event_data;
+
+    if (use_bssid_filter && !is_frame_bssid_matching(frame, bssid_filter))
+        return;
 
     unsigned size = frame->rx_ctrl.sig_len;
     unsigned ts_usec = frame->rx_ctrl.timestamp;

@@ -29,6 +29,7 @@ extern UART_HandleTypeDef DEBUG_UART;
 //uart definition//
 
 //cmd type definition//
+#define MIN_TIMEOUT_BETWEEN_SEND_MS 300
 #define CMD_START "AT+"
 #define CMD_PARAM_START '='
 #define EMPTY_PARAM 0

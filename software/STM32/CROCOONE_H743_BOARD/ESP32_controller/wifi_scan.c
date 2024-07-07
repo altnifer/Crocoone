@@ -75,7 +75,7 @@ void scan_main_task(void *main_task_handle) {
 			if (menu_flag) {
 				if (scan_list_curr_set != target) {
 					AP_list[scan_list_curr_set][0] = '>';
-					target = scan_list_curr_set;
+					target = scan_list_curr_set + 1;
 					if (previous_target != -1)
 						AP_list[previous_target][0] = ' ';
 					previous_target = scan_list_curr_set;
@@ -200,10 +200,10 @@ bool parse_APs(char ***AP_list, uint16_t *AP_count) {
     uint16_t ssid_len;
 	for (uint16_t i = 0; i < *AP_count; i++) {
 		packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"_SSID: ", 7);
-		if (packet_start == -1)	return false;
+		if (packet_start == -1)	break;
 		ringBuffer_clearNBytes(uart_ring_buffer, packet_start + 7);
 		ssid_len = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"\n", 1);
-		if (ssid_len == -1)	return false;
+		if (ssid_len == -1)	break;
 
         *(*AP_list + i) = (char *)malloc((ssid_len + 2) * sizeof(char));
 

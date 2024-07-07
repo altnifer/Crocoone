@@ -5,6 +5,7 @@
  *      Author: nikit
  */
 #include <uart_controller.h>
+#include "cmsis_os.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -61,18 +62,22 @@ uint16_t get_recieved_pkts_count() {
 }
 
 bool send_cmd_with_check(cmd_data_t cmd_data, uint32_t timeout_ms) {
+	//static uint32_t previous_cmd_send_timeout = 0;
+
+	//while ((HAL_GetTick() - previous_cmd_send_timeout) < MIN_TIMEOUT_BETWEEN_SEND_MS);
+	vTaskDelay(250 / portTICK_PERIOD_MS);
+
 	bool ret_val = false;
 	clear_rx_buff();
 	clear_tx_buff();
 	ring_buffer.readFlag = true;
 	ringBuffer_clear(&ring_buffer);
-	ring_buffer.readFlag = false;
 	uint16_t responce_len = strlen("OK - cmd accepted: ");
 	memcpy(tx_buff, "OK - cmd accepted: ", responce_len);
 	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)(tx_buff + responce_len));
-
 	get_recieved_pkts_count();
-	HAL_UART_Transmit_IT(&ESP32_AT_UART_Port, tx_buff + responce_len, cmd_len);
+	ring_buffer.readFlag = false;
+	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff + responce_len, cmd_len, 500);
 	HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_AT_UART_Port, rx_buff, RX_BUFF_SIZE);
 	__HAL_DMA_DISABLE_IT(&ESP32_UART_DMA_LINE, DMA_IT_HT);
 
@@ -90,13 +95,17 @@ bool send_cmd_with_check(cmd_data_t cmd_data, uint32_t timeout_ms) {
 	ring_buffer.readFlag = true;
 	ringBuffer_clear(&ring_buffer);
 	ring_buffer.readFlag = false;
+
+	//previous_cmd_send_timeout = HAL_GetTick();
 	return ret_val;
 }
 
 void send_cmd_without_check(cmd_data_t cmd_data) {
 	clear_tx_buff();
 	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)tx_buff);
-	HAL_UART_Transmit_IT(&ESP32_AT_UART_Port, tx_buff, cmd_len);
+	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff, cmd_len, 500);
+	HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_AT_UART_Port, rx_buff, RX_BUFF_SIZE);
+	__HAL_DMA_DISABLE_IT(&ESP32_UART_DMA_LINE, DMA_IT_HT);
 }
 
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff) {

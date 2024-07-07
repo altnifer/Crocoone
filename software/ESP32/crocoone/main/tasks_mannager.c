@@ -326,9 +326,13 @@ void pmkid_cmd_check(cmd_data_t cmd_data) {
 void packet_monitor_cmd_check(cmd_data_t cmd_data) {
     int channel = cmd_data.param[0];
     int filter = cmd_data.param[1];
-    int timeout = cmd_data.param[2];
+    int target = cmd_data.param[2];
+    int timeout = cmd_data.param[3];
 
-    if (channel < MIN_CH || channel > MAX_CH) {
+    uint16_t ap_count = *get_aps_count();
+    wifi_ap_record_t *ap_info = get_aps_info();
+
+    if (target == EMPTY_PARAM && (channel < MIN_CH || channel > MAX_CH)) {
         send_cmd_responce("ERROR - wrong channel (param 0)", strlen("ERROR - wrong channel (param 0)"), cmd_data);
         return;        
     }    
@@ -339,9 +343,19 @@ void packet_monitor_cmd_check(cmd_data_t cmd_data) {
     }    
 
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong timeout (param 2)", strlen("ERROR - wrong timeout (param 2)"), cmd_data);       
+        send_cmd_responce("ERROR - wrong timeout (param 3)", strlen("ERROR - wrong timeout (param 3)"), cmd_data);       
         return;        
     }    
+
+    if (target != EMPTY_PARAM && (!get_scan_status() || !ap_count)) {
+        send_cmd_responce("ERROR - no AP's scanned", strlen("ERROR - no AP's scanned"), cmd_data);   
+        return;
+    }
+
+    if (target != EMPTY_PARAM && (target > ap_count || target < 0)) {
+        send_cmd_responce("ERROR - wrong target (param 2)", strlen("ERROR - wrong target (param 2)"), cmd_data);
+        return;        
+    }
 
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
@@ -350,7 +364,11 @@ void packet_monitor_cmd_check(cmd_data_t cmd_data) {
 
     send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
 
-    packet_monitor_start((uint8_t)channel, (uint8_t)filter);
+    packet_monitor_start(
+        (target == EMPTY_PARAM) ? ((uint8_t)channel) : ((ap_info + (target - 1))->primary), 
+        (uint8_t)filter,
+        (target == EMPTY_PARAM) ? (NULL) : ((ap_info + (target - 1))->bssid) 
+        );
 }
 
 void wifi_scan_responce(cmd_data_t cmd_data) {

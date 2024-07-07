@@ -39,9 +39,9 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
-  include("D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
-  include("D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
+  include("D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/mbedtls/mbedtls/include/cmake_install.cmake")
+  include("D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/mbedtls/mbedtls/3rdparty/cmake_install.cmake")
+  include("D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/mbedtls/mbedtls/library/cmake_install.cmake")
 
 endif()
 

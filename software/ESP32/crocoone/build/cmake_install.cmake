@@ -1,4 +1,4 @@
-# Install script for directory: D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone
+# Install script for directory: D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,7 +39,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for each subdirectory.
-  include("D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/esp-idf/cmake_install.cmake")
+  include("D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/cmake_install.cmake")
 
 endif()
 
@@ -51,5 +51,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

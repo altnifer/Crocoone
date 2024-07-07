@@ -9,7 +9,7 @@
 
 #define ASCII_HEX_FORMAT 0
 
-bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask);
+bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask, uint8_t *bssid);
 
 void packet_monitor_stop();
 

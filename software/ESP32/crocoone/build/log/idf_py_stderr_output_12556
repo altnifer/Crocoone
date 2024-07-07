@@ -1,1 +1,0 @@
-ninja: error: 'D:/Users/nikita/Documents/Crocoone/crocoone_refactoring/ESP_crocoone/main/attacks.c', needed by 'esp-idf/main/CMakeFiles/__idf_main.dir/attacks.c.obj', missing and no known rule to make it
