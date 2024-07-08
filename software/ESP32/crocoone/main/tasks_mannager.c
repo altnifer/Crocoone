@@ -48,7 +48,7 @@ void tasks_mannager_init() {
     };
     ESP_ERROR_CHECK(esp_timer_create(&task_timer_args, &task_timer_handle));
     memset(&curr_cmd_data, 0, sizeof(cmd_data_t));
-    xTaskCreate(task_mannager, "taskx_mannager_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
+    xTaskCreate(task_mannager, "task_mannager_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
 }
 
 void task_timer_callback(void *arg) {
@@ -181,7 +181,7 @@ bool start_task(cmd_data_t cmd_data) {
         pmkid_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, MONITOR_CMD)) {
         packet_monitor_cmd_check(cmd_data);
-    } else if (strcmp(cmd_data.cmdName, STOP_CMD)){
+    } else if (strcmp(cmd_data.cmdName, STOP_CMD)) {
         cmd_started = false;
     }
     return cmd_started;

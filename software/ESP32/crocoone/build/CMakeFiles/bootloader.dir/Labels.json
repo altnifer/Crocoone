@@ -2,34 +2,34 @@
 	"sources" : 
 	[
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/CMakeFiles/bootloader"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/CMakeFiles/bootloader"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/CMakeFiles/bootloader.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/CMakeFiles/bootloader.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/CMakeFiles/bootloader-complete.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/CMakeFiles/bootloader-complete.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule"
 		},
 		{
-			"file" : "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
+			"file" : "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule"
 		}
 	],
 	"target" : 

@@ -1,4 +1,4 @@
-/* * Data converted from D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from D:/Users/nikita/Documents/crocoone/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

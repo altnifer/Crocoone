@@ -39,6 +39,6 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/esp-idf/newlib/port/cmake_install.cmake")
+  include("D:/Users/nikita/Documents/crocoone/build/esp-idf/newlib/port/cmake_install.cmake")
 endif()
 

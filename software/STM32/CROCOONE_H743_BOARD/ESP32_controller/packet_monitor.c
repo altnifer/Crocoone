@@ -28,8 +28,8 @@ void packet_monitor_main_task(void *main_task_handle);
 bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff);
 void packet_parser_task(void *args);
 uint8_t invert_bit(const uint8_t byte, const uint8_t bit);
-void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint16_t ch, bool sd, bool refresh);
-void draw_packet_monitor_settings(int curr_set, int curr_sniffer_set, int ch, uint8_t filter_mask, bool use_target, bool refresh);
+void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint8_t ch, bool sd, bool refresh);
+void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uint8_t filter_mask, bool button, bool use_target, bool full_update);
 
 void ESP32_start_packet_monitor(TaskHandle_t *main_task_handle) {
 	xTaskCreate(packet_monitor_main_task, "pkt_monitor", 1024 * 4, main_task_handle, osPriorityNormal1, NULL);
@@ -38,22 +38,20 @@ void ESP32_start_packet_monitor(TaskHandle_t *main_task_handle) {
 void packet_monitor_main_task(void *main_task_handle) {
 	static uint16_t pktPerSec[MAX_WIFI_CH][PKT_TIME_SEC] = {};
 	static uint16_t maxPktPerSec[MAX_WIFI_CH] = {};
-	static const int max_set_count = 3;
-	static const int max_sniffer_set_count = 3;
 	char error_buff[100];
-	int curr_set = 0;
-	int curr_sniffer_set = 0;
+	uint8_t set = 0;
+	uint8_t mask_set = 0;
 	static uint8_t ch = 1;
 	static uint8_t filter_mask = 7;
 	uint8_t ch_temp = ch;
 	uint8_t filter_mask_temp = filter_mask;
 	eButtonEvent button_up, button_down, button_left, button_right, button_confirm;
 	uint32_t ticks = 0;
+	bool button_flag = false;
 	bool use_sd = false;
 	bool exit_with_error = true;
 	bool graph_page = true;
 	bool full_update_screen = true;
-	bool update_screen = true;
 	bool restart_monitor = true;
 	bool use_target_flag = false;
 	pktsSumm = 0;
@@ -63,31 +61,31 @@ void packet_monitor_main_task(void *main_task_handle) {
 	update_title_text("monitor");
 
 	while (1) {
+	//drawing on display
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
 		update_title_SD_flag(use_sd);
-
 		if (full_update_screen) {
 			refresh_title();
 			fillScreenExceptTitle();
 		}
-		if (graph_page && (full_update_screen || update_screen)) {
+		if (graph_page)
 			draw_packet_monitor_garph(pktPerSec[ch - 1], maxPktPerSec[ch - 1], ch, use_sd, full_update_screen);
-			full_update_screen = false;
-			update_screen = false;
-		} else if (!graph_page && (full_update_screen || update_screen)) {
-			draw_packet_monitor_settings(curr_set, curr_sniffer_set, ch_temp, filter_mask_temp, use_target_flag, full_update_screen);
-			full_update_screen = false;
-			update_screen = false;
-		}
+		else
+			draw_packet_monitor_settings(set, mask_set, ch_temp, filter_mask_temp, button_flag, use_target_flag, full_update_screen);
+		full_update_screen = false;
 		xSemaphoreGive(SPI2_mutex);
+	//
 
-
+	//buttons handling
+		//get buttons states
 		button_right = GetButtonState(BUTTON_RIGHT);
 		button_left = GetButtonState(BUTTON_LEFT);
 		button_up = GetButtonState(BUTTON_UP);
 		button_down = GetButtonState(BUTTON_DOWN);
 		button_confirm = GetButtonState(BUTTON_CONFIRM);
+		//
 
+		//handling common buttons
 		if (button_left == DOUBLE_CLICK && !use_sd) {
 			if (graph_page) {
 				filter_mask_temp = filter_mask;
@@ -97,62 +95,66 @@ void packet_monitor_main_task(void *main_task_handle) {
 			full_update_screen = true;
 		}
 
+		if (button_right == DOUBLE_CLICK) {
+			exit_with_error = false;
+			break; //exit
+		}
+		//
+
+		//handling buttons on the graph page
 		if (button_confirm == SINGLE_CLICK && graph_page) {
 			use_sd = !use_sd;
 			restart_monitor = true;
 			full_update_screen = true;
 		}
+		//
 
-		if (!graph_page) {
-			if (button_confirm == SINGLE_CLICK) {
-				if (curr_set == 0) {
-					if (curr_sniffer_set == 0)
-						filter_mask_temp = invert_bit(filter_mask_temp, 2); //data
-					else if (curr_sniffer_set == 1)
-						filter_mask_temp = invert_bit(filter_mask_temp, 1); //mgmt
-					else if (curr_sniffer_set == 2)
-						filter_mask_temp = invert_bit(filter_mask_temp, 0); //ctrl
-				} else if (curr_set == 1 && get_target() != -1) {
-					use_target_flag = !use_target_flag;
-				} else if (curr_set == 2) {
-					restart_monitor = true;
-					full_update_screen = true;
-					graph_page = true;
-				}
-				update_screen = true;
-			} else if (button_down == SINGLE_CLICK) {
-				curr_set = (curr_set + 1) % max_set_count;
-				update_screen = true;
-			} else if (button_up == SINGLE_CLICK) {
-				curr_set--;
-				if (curr_set < 0) curr_set = max_set_count - 1;
-				update_screen = true;
-			} else if (button_right == SINGLE_CLICK) {
-				if (curr_set == 0)
-					curr_sniffer_set = (curr_sniffer_set + 1) % max_sniffer_set_count;
-				else if (curr_set == 1) {
-					ch_temp++;
-					if (ch_temp > MAX_WIFI_CH) ch_temp = MIN_WIFI_CH;
-				}
-				update_screen = true;
-			} else if (button_left == SINGLE_CLICK) {
-				if (curr_set == 0) {
-					curr_sniffer_set--;
-					if (curr_sniffer_set < 0) curr_sniffer_set = max_sniffer_set_count - 1;
-				} else if (curr_set == 1) {
-					ch_temp--;
-					if (ch_temp < MIN_WIFI_CH) ch_temp = MAX_WIFI_CH;
-				}
-				update_screen = true;
-			}
+		//handling buttons on the settings page
+		if (!graph_page && button_confirm == SINGLE_CLICK && set == 0 && mask_set == 0)
+			filter_mask_temp = invert_bit(filter_mask_temp, 2); //data
+
+		if (!graph_page && button_confirm == SINGLE_CLICK && set == 0 && mask_set == 1)
+			filter_mask_temp = invert_bit(filter_mask_temp, 1); //mgmt
+
+		if (!graph_page && button_confirm == SINGLE_CLICK && set == 0 && mask_set == 2)
+			filter_mask_temp = invert_bit(filter_mask_temp, 0); //ctrl
+
+		if (!graph_page && button_confirm == SINGLE_CLICK && set == 1 && get_target() != -1)
+			use_target_flag = !use_target_flag;
+
+		if (!graph_page && button_confirm == SINGLE_CLICK && button_flag) {
+			restart_monitor = true;
+			full_update_screen = true;
+			graph_page = true;
 		}
 
-		if (button_right == DOUBLE_CLICK) {
-			exit_with_error = false;
-			break; //exit
+		if (!graph_page && button_down == SINGLE_CLICK && !button_flag)
+			set = (set + 1) % 2;
+
+		if (!graph_page && button_up == SINGLE_CLICK && !button_flag)
+			set = (set - 1) % 2;
+
+		if (!graph_page && button_right == SINGLE_CLICK && set == 0 && !button_flag)
+			mask_set = (mask_set + 1) % 3;
+
+		if (!graph_page && button_left == SINGLE_CLICK && set == 0 && !button_flag)
+			mask_set = (mask_set - 1) % 3;
+
+		if (!graph_page && button_right == SINGLE_CLICK && set == 1 && !button_flag) {
+			ch_temp++;
+			if (ch_temp > MAX_WIFI_CH) ch_temp = MIN_WIFI_CH;
 		}
 
+		if (!graph_page && button_left == SINGLE_CLICK && set == 1 && !button_flag) {
+			ch_temp--;
+			if (ch_temp < MIN_WIFI_CH) ch_temp = MAX_WIFI_CH;
+		}
 
+		if (!graph_page && (button_up == DOUBLE_CLICK || button_down == DOUBLE_CLICK)) button_flag = !button_flag;
+		//
+	//
+
+	//monitor control
 		if (restart_monitor) {
 			if (!packet_parser_restart(use_sd, ch_temp, filter_mask_temp, use_target_flag, error_buff)) break;
 			filter_mask = filter_mask_temp;
@@ -167,8 +169,6 @@ void packet_monitor_main_task(void *main_task_handle) {
 			if (pktsSumm > maxPktPerSec[ch - 1])
 				maxPktPerSec[ch - 1] = pktsSumm;
 			pktsSumm = 0;
-
-			if (graph_page) update_screen = true;
 			ticks = HAL_GetTick();
 		}
 
@@ -176,14 +176,18 @@ void packet_monitor_main_task(void *main_task_handle) {
 			sprintf(error_buff, "SD write error");
 			break;
 		}
+	//
 
 		osDelay(250 / portTICK_PERIOD_MS);
 	}
 
+//monitor deinit
 	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
 	parser_task_flag = false;
 	update_title_SD_flag(false);
+//
 
+//error handling
 	if (exit_with_error) {
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
 		drawErrorIcon(error_buff, strlen(error_buff), MAIN_ERROR_COLOR, MAIN_BG_COLOR);
@@ -195,9 +199,12 @@ void packet_monitor_main_task(void *main_task_handle) {
 			if (GetButtonState(BUTTON_RIGHT) == DOUBLE_CLICK) break;
 		}
 	}
+//
 
+//resume main task
 	vTaskResume(*((TaskHandle_t *)main_task_handle));
 	vTaskDelete(NULL);
+//
 }
 
 bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff) {
@@ -247,17 +254,20 @@ bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool us
 void packet_parser_task(void *args) {
 	static uint8_t packet_header[FRAME_HEADER_LEN + 1];
 	ring_buffer_t *uart_ring_buffer = get_ring_buff();
+	UART_ringBuffer_mutex_take();
 	ringBuffer_clear(uart_ring_buffer);
+	UART_ringBuffer_mutex_give();
 
 	while (parser_task_flag) {
 		osDelay(50 / portTICK_PERIOD_MS);
 
-		if (uart_ring_buffer->writeFlag) continue;
-
-		uart_ring_buffer->readFlag = true;
+		UART_ringBuffer_mutex_take();
 		for (uint16_t i = 0; i < get_recieved_pkts_count(); i++) {
 			int32_t packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"PCAP data (", 11);
-			if (packet_start == -1) break;
+			if (packet_start == -1) {
+				ringBuffer_clear(uart_ring_buffer);
+				break;
+			}
 
 			ringBuffer_clearNBytes(uart_ring_buffer, (uint16_t)packet_start);
 
@@ -274,8 +284,7 @@ void packet_parser_task(void *args) {
 			if (parser_use_sd_flag)
 				copy_ringBuff_to_SD_buff(uart_ring_buffer, bytes);
 		}
-		ringBuffer_clear(uart_ring_buffer);
-		uart_ring_buffer->readFlag = false;
+		UART_ringBuffer_mutex_give();
 
 		if ((SD_write_error = !SD_write_from_ringBuff()) == true)
 			break;
@@ -297,7 +306,7 @@ uint8_t invert_bit(const uint8_t byte, const uint8_t bit)
 }
 
 
-void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint16_t ch, bool sd, bool refresh) {
+void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint8_t ch, bool sd, bool refresh) {
 	static const uint16_t graphYStart = TITLE_END_Y + 9;
 	static const uint16_t MAX_DISP_PKTS = 80;
 	static char buff[30] = {};
@@ -355,90 +364,94 @@ void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t ma
 	ST7735_WriteString(2, graphYStart + 112, buff, Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 }
 
-void draw_packet_monitor_settings(int curr_set, int curr_sniffer_set, int ch, uint8_t filter_mask, bool use_target, bool refresh) {
-	static const uint16_t graphYStart = TITLE_END_Y + 9;
-	static uint16_t previous_set = 0;
-	static bool previous_use_target = false;
-	char buffer[10] = {};
+void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uint8_t filter_mask, bool button, bool use_target, bool full_update) {
+	const uint16_t graphYStart = TITLE_END_Y + 9;
+	char buffer[35] = {};
+	static uint8_t prev_set;
+	static uint8_t prev_mask_set;
+	static uint8_t prev_ch;
+	static uint8_t prev_filter_mask;
+	static bool prev_button;
+	static bool prev_use_target;
 
-	if (previous_use_target != use_target)
-		fillRect(0, graphYStart + 52, ST7735_WIDTH, 12, MAIN_BG_COLOR);
-
-	if (previous_set == 0 || refresh) {
-		ST7735_WriteString(15, graphYStart, "sniffer filter", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		drawFastHLine(5, graphYStart + 26, 118, MAIN_TXT_COLOR);
-		drawFastVLine(45, graphYStart + 15, 23, MAIN_TXT_COLOR);
-		drawFastVLine(85, graphYStart + 15, 23, MAIN_TXT_COLOR);
-		ST7735_WriteString(10, graphYStart + 15, "data", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(52, graphYStart + 15, "mgmt", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(92, graphYStart + 15, "ctrl", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		sprintf(buffer, "%c", filter_mask & 0b00000100 ? '1' : '0'); //data
-		ST7735_WriteString(20, graphYStart + 29, buffer, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		sprintf(buffer, "%c", filter_mask & 0b00000010 ? '1' : '0'); //mgmt
-		ST7735_WriteString(62, graphYStart + 29, buffer, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		sprintf(buffer, "%c", filter_mask & 0b00000001 ? '1' : '0'); //ctrl
-		ST7735_WriteString(102, graphYStart + 29, buffer, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(8, graphYStart, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(114, graphYStart, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
+	if (full_update || prev_button != button) {
+		drawIcon("parameters", !button, 4, graphYStart, 125, graphYStart + 100, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		darwMiddleButton("restart", 142, Font_7x10, button, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 	}
-	if (previous_set == 1 || refresh || previous_use_target != use_target) {
-		if (use_target) {
-			ST7735_WriteString(43, graphYStart + 52, "target", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			char *target_ssid = *(get_AP_list() + (get_target() - 1));
-			uint16_t target_ssid_len = strlen(target_ssid) - 1;
-			ST7735_WriteString((128 - target_ssid_len * 7) / 2, graphYStart + 64, target_ssid + 1, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			ST7735_WriteString(36, graphYStart + 52, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
-			ST7735_WriteString(87, graphYStart + 52, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
+
+	if (prev_use_target != use_target)
+		fillRect(10, graphYStart + 72, ST7735_WIDTH - 20, 24, MAIN_BG_COLOR);
+
+	if (full_update ||
+		prev_filter_mask != filter_mask ||
+		(prev_set == 0 && prev_button != button) ||
+		prev_set != set ||
+		prev_mask_set != mask_set ||
+		prev_use_target != use_target
+	) {
+		ST7735_WriteString(
+				(ST7735_WIDTH - strlen(" sniffer filter ") * 7) / 2,
+				graphYStart + 20,
+				(set == 0 && !button) ? ">sniffer filter<" : " sniffer filter ",
+				Font_7x10,
+				MAIN_TXT_COLOR,
+				MAIN_BG_COLOR
+				);
+		drawFastHLine(7, graphYStart + 46, 114, MAIN_TXT_COLOR);
+		drawFastVLine(45, graphYStart + 35, 23, MAIN_TXT_COLOR);
+		drawFastVLine(85, graphYStart + 35, 23, MAIN_TXT_COLOR);
+		ST7735_WriteString(10, graphYStart + 35, "data", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(52, graphYStart + 35, "mgmt", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(92, graphYStart + 35, "ctrl", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		sprintf(buffer, "%c", filter_mask & 0b00000100 ? '1' : '0'); //data
+		ST7735_WriteString(20, graphYStart + 49, buffer, Font_7x10,
+				(mask_set == 0 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
+				(mask_set == 0 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
+				);
+		sprintf(buffer, "%c", filter_mask & 0b00000010 ? '1' : '0'); //mgmt
+		ST7735_WriteString(62, graphYStart + 49, buffer, Font_7x10,
+				(mask_set == 1 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
+				(mask_set == 1 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
+				);
+		sprintf(buffer, "%c", filter_mask & 0b00000001 ? '1' : '0'); //ctrl
+		ST7735_WriteString(102, graphYStart + 49, buffer, Font_7x10,
+				(mask_set == 2 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
+				(mask_set == 2 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
+				);
+	}
+
+	if (full_update || prev_ch != ch || (prev_set == 1 && prev_button != button) || prev_set != set) {
+		if (use_target && get_target() != -1) {
+			ST7735_WriteString(
+					(ST7735_WIDTH - strlen(" target ") * 7) / 2,
+					graphYStart + 72,
+					(set == 1 && !button) ? ">target<" : " target ",
+					Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
+					);
+			char *target_ssid = *(get_AP_list() + (get_target() - 1)) + 1;
+			ST7735_WriteString((128 - (strlen(target_ssid) - 1) * 7) / 2, graphYStart + 84, target_ssid, Font_7x10,
+					(set == 1 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
+					(set == 1 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
+					);
 		} else {
-			ST7735_WriteString(40, graphYStart + 52, "channel", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+			ST7735_WriteString(
+					(ST7735_WIDTH - strlen(" channel ") * 7) / 2,
+					graphYStart + 72,
+					(set == 1 && !button) ? ">channel<" : " channel ",
+					Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
+					);
 			sprintf(buffer, "%02d", ch);
-			ST7735_WriteString(57, graphYStart + 64, buffer, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			ST7735_WriteString(33, graphYStart + 52, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
-			ST7735_WriteString(90, graphYStart + 52, " ", Font_7x10, MAIN_BG_COLOR, MAIN_BG_COLOR);
+			ST7735_WriteString(57, graphYStart + 84, buffer, Font_7x10,
+					(set == 1 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
+					(set == 1 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
+					);
 		}
 	}
-	if (previous_set == 2 || refresh) {
-		fillRoundRect(34, 141, 61, 14, 4, MAIN_BG_COLOR);
-		ST7735_WriteString(40, 144, "restart", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		drawRoundRect(34, 141, 61, 14, 4, MAIN_TXT_COLOR);
-	}
-	previous_set = curr_set;
-	previous_use_target = use_target;
 
-	switch (curr_set) {
-		case 0:
-			ST7735_WriteString(8, graphYStart, ">", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			ST7735_WriteString(114, graphYStart, "<", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			if (curr_sniffer_set == 0) {
-				sprintf(buffer, "%c", filter_mask & 0b00000100 ? '1' : '0'); //data
-				ST7735_WriteString(20, graphYStart + 29, buffer, Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-			} else if (curr_sniffer_set == 1) {
-				sprintf(buffer, "%c", filter_mask & 0b00000010 ? '1' : '0'); //mgmt
-				ST7735_WriteString(62, graphYStart + 29, buffer, Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-			} else if (curr_sniffer_set == 2){
-				sprintf(buffer, "%c", filter_mask & 0b00000001 ? '1' : '0'); //ctrl
-				ST7735_WriteString(102, graphYStart + 29, buffer, Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-			}
-			break;
-		case 1:
-			if (use_target) {
-				char *target_ssid = *(get_AP_list() + (get_target() - 1));
-				uint16_t target_ssid_len = strlen(target_ssid) - 1;
-				ST7735_WriteString((128 - target_ssid_len * 7) / 2, graphYStart + 64, target_ssid + 1, Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-				ST7735_WriteString(36, graphYStart + 52, ">", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-				ST7735_WriteString(87, graphYStart + 52, "<", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			} else {
-				sprintf(buffer, "%02d", ch);
-				ST7735_WriteString(57, graphYStart + 64, buffer, Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-				ST7735_WriteString(33, graphYStart + 52, ">", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-				ST7735_WriteString(90, graphYStart + 52, "<", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-			}
-			break;
-		case 2:
-			fillRoundRect(34, 141, 61, 14, 4, MAIN_TXT_COLOR);
-			ST7735_WriteString(40, 144, "restart", Font_7x10, MAIN_BG_COLOR, MAIN_TXT_COLOR);
-			break;
-		default:
-			break;
-	}
+	prev_set = set;
+	prev_mask_set = mask_set;
+	prev_ch = ch;
+	prev_filter_mask = filter_mask;
+	prev_button = button;
+	prev_use_target = use_target;
 }

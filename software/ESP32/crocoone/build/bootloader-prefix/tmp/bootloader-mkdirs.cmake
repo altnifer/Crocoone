@@ -5,18 +5,18 @@ cmake_minimum_required(VERSION 3.5)
 
 file(MAKE_DIRECTORY
   "D:/DATA/Program/ESP-IDF/components/bootloader/subproject"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/tmp"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src"
-  "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/tmp"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src"
+  "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp"
 )
 
 set(configSubDirs )
 foreach(subDir IN LISTS configSubDirs)
-    file(MAKE_DIRECTORY "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
+    file(MAKE_DIRECTORY "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp/${subDir}")
 endforeach()
 if(cfgdir)
-  file(MAKE_DIRECTORY "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
+  file(MAKE_DIRECTORY "D:/Users/nikita/Documents/crocoone/build/bootloader-prefix/src/bootloader-stamp${cfgdir}") # cfgdir has leading slash
 endif()

@@ -1,4 +1,4 @@
-# Install script for directory: D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/components/uart_controller
+# Install script for directory: D:/Users/nikita/Documents/crocoone/components/uart_controller
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

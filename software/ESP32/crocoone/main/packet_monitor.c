@@ -24,14 +24,13 @@ static const uint16_t frame_header_len = 34;
 static char monitor_buff[MONITOR_BUFF_LEN] = {};
 static char *curr_mon_buff_p = NULL;
 static bool mon_buff_is_empty = true;
-static esp_timer_handle_t packet_monitor_timer_handle;
-static bool packet_monitor_run = false;
+static bool packet_sender_task_handler = false;
 static uint16_t packet_counter;
 static bool use_bssid_filter;
 static uint8_t bssid_filter[6];
 static bool uart_busy = false;
 
-static void timer_packet_monitor(void *arg);
+void packet_sender_task(void *args);
 static void sniffer_events_handler(void *args, esp_event_base_t event_base, int32_t event_id, void *event_data);
 void frame_header_update(uint16_t pkts, uint16_t bytes);
 
@@ -40,7 +39,7 @@ bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask, uint8_t *bssi
     if ((channel < MIN_CH || channel > MAX_CH) || (filter_bitmask < MIN_BIT_MASK_FILTER || filter_bitmask > MAX_BIT_MASK_FILTER))
         return false;
 
-    if (packet_monitor_run)
+    if (packet_sender_task_handler)
         packet_monitor_stop();
 
     packet_counter = 0;
@@ -79,41 +78,41 @@ bool packet_monitor_start(uint8_t channel, uint8_t filter_bitmask, uint8_t *bssi
     filter_bitmask = filter_bitmask / 2;
     wifi_sniffer_filter_frame_types(data, mgmt, ctrl);
     ESP_ERROR_CHECK(esp_event_handler_register(SNIFFER_EVENTS, ESP_EVENT_ANY_ID, &sniffer_events_handler, NULL));
-    const esp_timer_create_args_t pkt_timer_args = {
-        .callback = &timer_packet_monitor,
-    };
-    ESP_ERROR_CHECK(esp_timer_create(&pkt_timer_args, &packet_monitor_timer_handle));
-
+    packet_sender_task_handler = true;
+    xTaskCreate(packet_sender_task, "monitor_task", 1024*2, NULL, configMAX_PRIORITIES - 1, NULL);
     wifi_sniffer_start(channel);
-    ESP_ERROR_CHECK(esp_timer_start_periodic(packet_monitor_timer_handle, MIN_UART_WRITE_TIMEOUT_MS * 1000));
 
-    packet_monitor_run = true;
     return true;
 }
 
 void packet_monitor_stop() {
-    if (!packet_monitor_run) 
-        return;
-    wifi_sniffer_stop();
-    ESP_ERROR_CHECK(esp_timer_stop(packet_monitor_timer_handle));
-    ESP_ERROR_CHECK(esp_event_handler_unregister(SNIFFER_EVENTS, ESP_EVENT_ANY_ID, &sniffer_events_handler));
-    esp_timer_delete(packet_monitor_timer_handle);
-    packet_monitor_run = false;
+    if (packet_sender_task_handler) {
+        wifi_sniffer_stop();
+        ESP_ERROR_CHECK(esp_event_handler_unregister(SNIFFER_EVENTS, ESP_EVENT_ANY_ID, &sniffer_events_handler));
+    }
+    packet_sender_task_handler = false;
 }
 
-static void timer_packet_monitor(void *arg) {
-    if (mon_buff_is_empty)
-        return;
-    uart_busy = true;
-    *curr_mon_buff_p = '\n';
-    uint16_t packet_len = curr_mon_buff_p - monitor_buff;
-    frame_header_update(packet_counter, packet_len - frame_header_len);
-    packet_len++;
-    UART_write(monitor_buff, packet_len);
-    curr_mon_buff_p = monitor_buff + frame_header_len;
-    packet_counter = 0;
-    mon_buff_is_empty = true;
-    uart_busy = false;
+void packet_sender_task(void *args) {
+
+    while (packet_sender_task_handler) {
+        vTaskDelay(MIN_UART_WRITE_TIMEOUT_MS / portTICK_PERIOD_MS);
+
+        if (mon_buff_is_empty)
+            continue;
+        uart_busy = true;
+        *curr_mon_buff_p = '\n';
+        uint16_t packet_len = curr_mon_buff_p - monitor_buff;
+        frame_header_update(packet_counter, packet_len - frame_header_len);
+        packet_len++;
+        UART_write(monitor_buff, packet_len);
+        curr_mon_buff_p = monitor_buff + frame_header_len;
+        packet_counter = 0;
+        mon_buff_is_empty = true;
+        uart_busy = false;
+    }
+
+    vTaskDelete(NULL);
 }
 
 static void sniffer_events_handler(void *args, esp_event_base_t event_base, int32_t event_id, void *event_data) {

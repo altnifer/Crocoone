@@ -158,9 +158,14 @@ bool start_scan(uint32_t timeout, char *error_buff) {
 	uint32_t tick_counter = HAL_GetTick();
 
 	while (HAL_GetTick() - tick_counter < timeout)
-		if (get_recieved_pkts_count())
-			if (parse_APs(&AP_list, &AP_count))
+		if (get_recieved_pkts_count()) {
+			UART_ringBuffer_mutex_take();
+			if (parse_APs(&AP_list, &AP_count)) {
+				UART_ringBuffer_mutex_give();
 				return true;
+			}
+			UART_ringBuffer_mutex_give();
+		}
 
 	memcpy(error_buff,
 			"failure while parsing msg\0",
@@ -171,12 +176,10 @@ bool start_scan(uint32_t timeout, char *error_buff) {
 bool parse_APs(char ***AP_list, uint16_t *AP_count) {
 	int32_t packet_start;
 	ring_buffer_t *uart_ring_buffer = get_ring_buff();
-	uart_ring_buffer->readFlag = true;
 
     packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)SCAN_PACKET_HEADER, SCAN_PACKET_HEADER_LEN);
 
 	if (packet_start == -1) {
-		uart_ring_buffer->readFlag = false;
 		return false;
 	}
 

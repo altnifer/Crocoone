@@ -18,9 +18,6 @@ bool ringBuffer_init(ring_buffer_t *buffer, uint8_t poverOf2) {
     buffer->bytes_to_write = buff_size;
     buffer->bytes_to_read = 0;
 
-    buffer->readFlag = false;
-    buffer->writeFlag = false;
-
     return true;
 }
 
@@ -38,9 +35,6 @@ bool ringBuffer_deInit(ring_buffer_t *buffer) {
 
     buffer->bytes_to_write = 0;
     buffer->bytes_to_read = 0;
-
-    buffer->readFlag = true;
-    buffer->writeFlag = true;
 
     return true;
 }

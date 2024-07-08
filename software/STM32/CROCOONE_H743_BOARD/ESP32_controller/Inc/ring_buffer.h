@@ -16,9 +16,6 @@ typedef struct {
 
     uint16_t bytes_to_read;
     uint16_t bytes_to_write;
-
-    bool readFlag;
-    bool writeFlag;
 } ring_buffer_t; 
 
 bool ringBuffer_init(ring_buffer_t *buffer, uint8_t poverOf2);

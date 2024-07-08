@@ -26,8 +26,8 @@ void pmkid_attack_parser_task(void * arg);
 void pmkid_attack_main_task(void *main_task_handle);
 bool pmkid_attack_setup(char *error_buff);
 void pmkid_attack_unsetup();
-void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh);
-void draw_restart_page(uint16_t pmkid_count);
+static void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh);
+static void draw_restart_page(uint16_t pmkid_count);
 
 
 void ESP32_start_pmkid_attack(TaskHandle_t *main_task_handle) {
@@ -129,18 +129,23 @@ void pmkid_attack_main_task(void *main_task_handle) {
 
 void pmkid_attack_parser_task(void * arg) {
 	ring_buffer_t *uart_ring_buffer = get_ring_buff();
+	UART_ringBuffer_mutex_take();
 	ringBuffer_clear(uart_ring_buffer);
+	UART_ringBuffer_mutex_give();
 
 	while (pmkid_task_flag) {
 		osDelay(50 / portTICK_PERIOD_MS);
 
-		if (uart_ring_buffer->writeFlag) continue;
-
+		UART_ringBuffer_mutex_take();
 		for (uint16_t i = 0; i < get_recieved_pkts_count(); i++) {
-			uart_ring_buffer->readFlag = true;
 
 		    int32_t SSID_packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)SSID_PACKET_HEADER, SSID_PACKET_HEADER_LEN);
 		    int32_t PMKID_packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)PMKID_PACKET_HEADER, PMKID_PACKET_HEADER_LEN);
+
+		    if (SSID_packet_start == -1 && PMKID_packet_start == -1) {
+		    	ringBuffer_clear(uart_ring_buffer);
+		    	break;
+		    }
 
 		    if (((SSID_packet_start < PMKID_packet_start) || (PMKID_packet_start == -1)) && SSID_packet_start != -1) {
 		    	ringBuffer_clearNBytes(uart_ring_buffer, SSID_packet_start + SSID_PACKET_HEADER_LEN);
@@ -165,8 +170,7 @@ void pmkid_attack_parser_task(void * arg) {
 		    }
 
 		}
-		ringBuffer_clear(uart_ring_buffer);
-		uart_ring_buffer->readFlag = false;
+		UART_ringBuffer_mutex_give();
 
 		if ((SD_write_error = !SD_write_from_ringBuff()) == true)
 			break;
@@ -216,7 +220,7 @@ void pmkid_attack_unsetup() {
 	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
 }
 
-void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh) {
+static void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh) {
 	const uint16_t YStart = 20;
 	const uint16_t MAX_CH_IN_STR = 13;
 	char str[20] = {};
@@ -246,7 +250,7 @@ void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh
 	refresh_title();
 }
 
-void draw_restart_page(uint16_t pmkid_count) {
+static void draw_restart_page(uint16_t pmkid_count) {
 	const uint16_t YStart = 20;
 	char str[20] = {};
 

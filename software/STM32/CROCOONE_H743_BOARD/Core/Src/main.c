@@ -156,7 +156,7 @@ int main(void)
   ST7735_Init(0);
   fillScreen(MAIN_BG_COLOR);
   HAL_GPIO_WritePin(ESP_RESET_GPIO_Port, ESP_RESET_Pin, GPIO_PIN_SET);
-  HAL_Delay(50);
+  HAL_Delay(100);
   HAL_GPIO_WritePin(ESP_RESET_GPIO_Port, ESP_RESET_Pin, GPIO_PIN_RESET);
   HAL_GPIO_WritePin(LCD_LIGHT_GPIO_Port, LCD_LIGHT_Pin, GPIO_PIN_SET);
 
@@ -168,7 +168,6 @@ int main(void)
   AddButton(BUTTON_DOWN, BUTTON2_GPIO_Port, BUTTON2_Pin);
   HAL_TIM_Base_Start_IT(&htim2);
 
-  UART_parser_init();
   eeprom_init();
   nrf_init();
   powerDown();
@@ -205,6 +204,7 @@ int main(void)
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+  UART_parser_init();
   /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */

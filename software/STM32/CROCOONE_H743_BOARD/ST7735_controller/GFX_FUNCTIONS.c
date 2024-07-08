@@ -381,36 +381,37 @@ void drawMenu(char ** param, uint16_t str_count, uint16_t x0, uint16_t y0, uint1
 void drawIcon(const char* header_t, bool highlight,
 		uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
 		FontDef font, uint16_t txt_color, uint16_t bg_color) {
-
+	static bool prev_highlight = true;
 	const uint8_t max_ch_in_str = (x1 - x0 - 4) / font.width;
 	char header[max_ch_in_str + 1];
 	memset(header, 0, (max_ch_in_str + 1)*sizeof(char));
 	strncpy(header, header_t, max_ch_in_str);
 	uint16_t len = strlen(header);
 
-	//fillRect(x0, y0, x1 - x0, y1 - y0, bg_color);//BLUE);
-	fillRect(x0 + 2, y0 + 2, x1 - x0 - 4, font.height + 3, bg_color);
-	drawRoundRect(x0, y0, x1 - x0, y1 - y0, 5, bg_color);
-	drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 3, bg_color);
+	if (prev_highlight != highlight) {
+		fillRect(x0 + 2, y0 + 2, x1 - x0 - 4, font.height + 3, bg_color);
+		drawRoundRect(x0, y0, x1 - x0, y1 - y0, 5, bg_color);
+		drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 3, bg_color);
+	}
 
 	if (highlight) {
 		fillRect(x0 + 2, y0 + 2, x1 - x0 - 4, font.height + 3, txt_color);
 		drawRoundRect(x0, y0, x1 - x0, y1 - y0, 5, txt_color);
 		drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 3, txt_color);
 		ST7735_WriteString(x0 + (x1 - x0 - 4 - len * font.width) / 2 + 2, y0 + 4, header, font, bg_color, txt_color);
-		return;
+	} else {
+		drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 5, txt_color);
+		drawFastHLine(x0 + 1, y0 + 2 + font.height + 2, x1 - x0 - 2, txt_color);
+		ST7735_WriteString(x0 + (x1 - x0 - 4 - len * font.width) / 2 + 2, y0 + 4, header, font, txt_color, bg_color);
 	}
 
-	drawRoundRect(x0 + 1, y0 + 1, x1 - x0 - 2, y1 - y0 - 2, 5, txt_color);
-	drawFastHLine(x0 + 1, y0 + 2 + font.height + 2, x1 - x0 - 2, txt_color);
-	ST7735_WriteString(x0 + (x1 - x0 - 4 - len * font.width) / 2 + 2, y0 + 4, header, font, txt_color, bg_color);
+	prev_highlight = highlight;
 }
 
 void drawErrorIcon(char *error_text, int error_len, uint16_t txt_color, uint16_t bg_color) {
 	static const uint8_t max_str_count = 4;
 	static const uint8_t max_ch_in_str = 15;
 	char buffer[16] = {};
-
 
 	fillRoundRect(3, 38, 122, 84, 5, bg_color);
 	drawRoundRect(5, 40, 118, 80, 5, txt_color);
@@ -438,6 +439,7 @@ void drawErrorIcon(char *error_text, int error_len, uint16_t txt_color, uint16_t
 }
 
 void darwMiddleButton(char *button_text, uint16_t y0, FontDef font, bool highlight, uint16_t txt_color, uint16_t bg_color) {
+	static bool prev_highlight = true;
 	const uint16_t max_char_count = (ST7735_WIDTH / font.width) - 2;
 	char crop_button_text[max_char_count + 1];
 	uint16_t button_text_len = strlen(button_text);
@@ -448,14 +450,18 @@ void darwMiddleButton(char *button_text, uint16_t y0, FontDef font, bool highlig
 	uint16_t button_len = (button_text_len + 2) * font.width;
 	uint16_t button_X_start = (ST7735_WIDTH - button_len) / 2;
 
+	if (prev_highlight != highlight)
+		fillRoundRect(button_X_start, y0, button_len, 4 + font.height, font.width, bg_color);
+
 	if (highlight) {
 		fillRoundRect(button_X_start, y0, button_len, 4 + font.height, font.width, txt_color);
 		ST7735_WriteString(button_X_start + font.width, y0 + 2, crop_button_text, font, bg_color, txt_color);
 	} else {
-		fillRoundRect(button_X_start, y0, button_len, 4 + font.height, font.width, bg_color);
 		drawRoundRect(button_X_start, y0, button_len, 4 + font.height, font.width, txt_color);
 		ST7735_WriteString(button_X_start + font.width, y0 + 2, crop_button_text, font, txt_color, bg_color);
 	}
+
+	prev_highlight = highlight;
 }
 
 /*/______________________________________________________________________________________/*/

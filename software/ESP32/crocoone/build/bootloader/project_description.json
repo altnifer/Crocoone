@@ -1,8 +1,8 @@
 {
     "project_name":       "bootloader",
     "project_path":       "D:/DATA/Program/ESP-IDF/components/bootloader/subproject",
-    "build_dir":          "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/build/bootloader",
-    "config_file":        "D:/Users/nikita/Documents/GitHub/Crocoone/software/ESP32/crocoone/sdkconfig",
+    "build_dir":          "D:/Users/nikita/Documents/crocoone/build/bootloader",
+    "config_file":        "D:/Users/nikita/Documents/crocoone/sdkconfig",
     "config_defaults":    "",
     "bootloader_elf":     "",
     "app_elf":            "bootloader.elf",

@@ -29,7 +29,7 @@ extern UART_HandleTypeDef DEBUG_UART;
 //uart definition//
 
 //cmd type definition//
-#define MIN_TIMEOUT_BETWEEN_SEND_MS 300
+#define MIN_TIMEOUT_BETWEEN_SEND_MS 500
 #define CMD_START "AT+"
 #define CMD_PARAM_START '='
 #define EMPTY_PARAM 0
@@ -57,14 +57,6 @@ typedef struct {
 
 void UART_parser_init();
 
-void UART_parser_handler_register(void (* parser_task)(uint8_t *buffer, uint16_t Size));
-
-void UART_parser_curr_handler_unregister();
-
-void clear_rx_buff();
-
-void clear_tx_buff();
-
 uint16_t get_recieved_pkts_count();
 
 ring_buffer_t *get_ring_buff();
@@ -72,5 +64,9 @@ ring_buffer_t *get_ring_buff();
 bool send_cmd_with_check(cmd_data_t cmd_data, uint32_t timeout_ms);
 
 void send_cmd_without_check(cmd_data_t cmd_data);
+
+void UART_ringBuffer_mutex_take();
+
+void UART_ringBuffer_mutex_give();
 
 #endif /* INC_UART_PARSER_H_ */

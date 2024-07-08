@@ -3,10 +3,10 @@
 
 #include <stddef.h>
 
-#define TXD_PIN 17 //19 for esp32 c6 // 17 for esp32 c3
-#define RXD_PIN 16 //20 for esp32 c6 // 16 for esp32 c3
+#define TXD_PIN 17
+#define RXD_PIN 16
 
-#define UART_PORT_NUM 2 //1 for esp32 c6 //2 for esp32 c3
+#define UART_PORT_NUM 2
 
 void UART_init();
 
