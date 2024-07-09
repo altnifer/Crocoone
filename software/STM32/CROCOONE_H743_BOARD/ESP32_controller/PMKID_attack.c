@@ -198,9 +198,8 @@ bool pmkid_attack_setup(char *error_buff) {
 		return false;
 	}
 
-	if (!send_cmd_with_check((cmd_data_t){PMKID_CMD, {0,0,0,0,0}}, 2000)) {
+	if (!send_cmd_with_check((cmd_data_t){PMKID_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
 		SD_unsetup();
-		sprintf(error_buff, "failure while sending cmd: PMKID_ATTACK");
 		return false;
 	}
 

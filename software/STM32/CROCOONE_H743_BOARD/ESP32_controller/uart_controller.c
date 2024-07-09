@@ -86,39 +86,60 @@ uint16_t get_recieved_pkts_count() {
 	return ret_val;
 }
 
-bool send_cmd_with_check(cmd_data_t cmd_data, uint32_t timeout_ms) {
-	bool ret_val = false;
-
+bool send_cmd_with_check(cmd_data_t cmd_data, char *error_buff, uint32_t timeout_ms) {
 	vTaskDelay(MIN_TIMEOUT_BETWEEN_SEND_MS / portTICK_PERIOD_MS);
 
 	xSemaphoreTake(UART_ringBuffer_mutex, portMAX_DELAY);
 	ringBuffer_clear(&ring_buffer);
 
 	pkts_recieved = 0;
-	uint16_t responce_len = strlen("OK - cmd accepted: ");
-	memcpy(tx_buff, "OK - cmd accepted: ", responce_len);
-	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)(tx_buff + responce_len));
+	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)(tx_buff));
 
 	xSemaphoreTake(ESP_UART_mutex, portMAX_DELAY);
-	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff + responce_len, cmd_len, 100);
+	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff, cmd_len, 100);
 	HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_AT_UART_Port, rx_buff, RX_BUFF_SIZE);
 	__HAL_DMA_DISABLE_IT(&ESP32_UART_DMA_LINE, DMA_IT_HT);
 	xSemaphoreGive(ESP_UART_mutex);
 
 	xSemaphoreGive(UART_ringBuffer_mutex);
 
+	int32_t msg_start;
 	uint32_t curr_time = HAL_GetTick();
 	while ((HAL_GetTick() - curr_time) < timeout_ms) {
-		if (pkts_recieved) {
-			pkts_recieved = 0;
-			xSemaphoreTake(UART_ringBuffer_mutex, portMAX_DELAY);
-			if (ringBuffer_findSequence(&ring_buffer, tx_buff, responce_len + cmd_len) != -1) ret_val = true;
+		if (!pkts_recieved) continue;
+		pkts_recieved = 0;
+		xSemaphoreTake(UART_ringBuffer_mutex, portMAX_DELAY);
+		if ((msg_start = ringBuffer_findSequence(&ring_buffer, tx_buff, cmd_len)) == -1) {
 			xSemaphoreGive(UART_ringBuffer_mutex);
+			continue;
 		}
-		if (ret_val) break;
+
+		if (ringBuffer_findSequence(&ring_buffer,
+				(uint8_t *)" - cmd accepted and started",
+				strlen(" - cmd accepted and started")
+		) != -1) {
+			xSemaphoreGive(UART_ringBuffer_mutex);
+			return true;
+		}
+
+		uint16_t error_responce_len = strlen(" - cmd accepted with error: ");
+		if (ringBuffer_findSequence(&ring_buffer,
+				(uint8_t *)" - cmd accepted with error: ",
+				error_responce_len
+		) != -1) {
+			ringBuffer_clearNBytes(&ring_buffer, msg_start + cmd_len + error_responce_len);
+			int32_t erro_msg_len = ringBuffer_findSequence(&ring_buffer, (uint8_t *)"\n", 1);
+			ringBuffer_get(&ring_buffer, (uint8_t *)error_buff, erro_msg_len);
+			xSemaphoreGive(UART_ringBuffer_mutex);
+			return false;
+		}
+
+		xSemaphoreGive(UART_ringBuffer_mutex);
+		break;
 	}
 
-	return ret_val;
+	memcpy(error_buff, "no response", strlen("no response") + 1);
+	return false;
 }
 
 void send_cmd_without_check(cmd_data_t cmd_data) {

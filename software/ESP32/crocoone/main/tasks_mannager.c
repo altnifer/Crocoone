@@ -16,30 +16,27 @@
 #include <stdio.h>
 #include <string.h>
 
-static char rx_buff[RX_BUF_SIZE] = {};
-static char tx_buff[TX_BUF_SIZE] = {};
-
+static char rx_buff[RX_BUF_SIZE];
+static char tx_buff[TX_BUF_SIZE];
 static esp_timer_handle_t task_timer_handle;
 static cmd_data_t curr_cmd_data;
 static bool timer_is_active = false;
 
 void task_timer_callback(void *arg);
 void task_mannager(void *args);
-
 bool parse_first_cmd(char *buffer, unsigned int buffer_len, cmd_data_t *output);
 unsigned int contains_symbol(char *symbols, unsigned int symbols_len, char symbol);
 unsigned int get_first_token(char *str, unsigned int str_len, char *separators, unsigned int sep_count);
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff);
-void send_cmd_responce(char *msg, uint16_t msg_len, cmd_data_t cmd_data);
-
+void send_error_responce(cmd_data_t cmd_data, char *eeror_msg);
+void send_responce(cmd_data_t cmd_data);
 bool start_task(cmd_data_t cmd_data);
 bool stop_curr_task(cmd_data_t cmd_data);
-
-void deauth_cmd_check(cmd_data_t cmd_data);
-void handshake_cmd_check(cmd_data_t cmd_data);
-void beacon_cmd_check(cmd_data_t cmd_data);
-void pmkid_cmd_check(cmd_data_t cmd_data);
-void packet_monitor_cmd_check(cmd_data_t cmd_data);
+bool deauth_cmd_check(cmd_data_t cmd_data);
+bool handshake_cmd_check(cmd_data_t cmd_data);
+bool beacon_cmd_check(cmd_data_t cmd_data);
+bool pmkid_cmd_check(cmd_data_t cmd_data);
+bool packet_monitor_cmd_check(cmd_data_t cmd_data);
 void wifi_scan_responce(cmd_data_t cmd_data);
 
 void tasks_mannager_init() {
@@ -68,14 +65,10 @@ void task_mannager(void *args) {
         if (!parse_first_cmd(rx_buff, buffer_len, &cmd_data))
             continue;
 
-        bool curr_task_stopped = stop_curr_task(curr_cmd_data);
+        stop_curr_task(curr_cmd_data);
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        send_cmd_responce("OK - cmd accepted", strlen("OK - cmd accepted"), cmd_data);
-        if (curr_task_stopped) send_cmd_responce("OK - task stopped", strlen("OK - task stopped"), curr_cmd_data);
         memset(&curr_cmd_data, 0, sizeof(cmd_data_t));
-        if (!start_task(cmd_data)) send_cmd_responce("ERROR - wrong cmd name", strlen("ERROR - wrong cmd name"), cmd_data);
-        curr_cmd_data = cmd_data;
-
+        if (start_task(cmd_data)) curr_cmd_data = cmd_data;
         memset(rx_buff, 0, RX_BUF_SIZE);
     }
 }
@@ -154,17 +147,23 @@ uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff) {
     return strlen(buff);
 }
 
-void send_cmd_responce(char *msg, uint16_t msg_len, cmd_data_t cmd_data) {
-    uint16_t tx_buff_len = msg_len + 2;  
-    sprintf(tx_buff, "%s: ", msg);  
-    tx_buff_len += add_cmd_to_buff(cmd_data, tx_buff + tx_buff_len);
-    tx_buff[tx_buff_len] = '\n';
-    tx_buff_len++;
-    tx_buff[tx_buff_len] = '\0';
+void send_error_responce(cmd_data_t cmd_data, char *eeror_msg) {
+    uint16_t cmd_len = add_cmd_to_buff(cmd_data, tx_buff);
+    uint16_t msg_len = strlen(" - cmd accepted with error: ");
+    uint16_t error_len = strlen(eeror_msg);
+    memcpy(tx_buff + cmd_len, " - cmd accepted with error: ", msg_len);
+    memcpy(tx_buff + cmd_len + msg_len, eeror_msg, error_len);
+    memcpy(tx_buff + cmd_len + msg_len + error_len, "\n", 2);
     UART_write(tx_buff, strlen(tx_buff));
     vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
+void send_responce(cmd_data_t cmd_data) {
+    uint16_t cmd_len = add_cmd_to_buff(cmd_data, tx_buff);
+    memcpy(tx_buff + cmd_len, " - cmd accepted and started\n", strlen(" - cmd accepted and started\n") + 1);
+    UART_write(tx_buff, strlen(tx_buff));
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+}
 
 
 bool start_task(cmd_data_t cmd_data) {
@@ -172,16 +171,19 @@ bool start_task(cmd_data_t cmd_data) {
     if (!strcmp(cmd_data.cmdName, SCAN_CMD)) {
         wifi_scan_responce(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, DEAUTH_CMD)) {
-        deauth_cmd_check(cmd_data);
+        cmd_started = deauth_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, BEACON_CMD)) {
-        beacon_cmd_check(cmd_data);
+        cmd_started = beacon_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, HANDSHAKE_CMD)) {
-        handshake_cmd_check(cmd_data);
+        cmd_started = handshake_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, PMKID_CMD)) {
-        pmkid_cmd_check(cmd_data);
+        cmd_started = pmkid_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, MONITOR_CMD)) {
-        packet_monitor_cmd_check(cmd_data);
-    } else if (strcmp(cmd_data.cmdName, STOP_CMD)) {
+        cmd_started = packet_monitor_cmd_check(cmd_data);
+    } else if (!strcmp(cmd_data.cmdName, STOP_CMD)) {
+        send_responce(cmd_data);
+    } else {
+        send_error_responce(cmd_data, "wrong cmd");
         cmd_started = false;
     }
     return cmd_started;
@@ -189,7 +191,6 @@ bool start_task(cmd_data_t cmd_data) {
 
 bool stop_curr_task(cmd_data_t cmd_data) {
     bool task_stopped = true;
-
     if (!strcmp(cmd_data.cmdName, DEAUTH_CMD)) {
         deauth_attack_stop();
     } else if (!strcmp(cmd_data.cmdName, BEACON_CMD)) {
@@ -203,54 +204,43 @@ bool stop_curr_task(cmd_data_t cmd_data) {
     } else {
         task_stopped = false;
     }
-
     if (task_stopped) {
         if (timer_is_active)
             esp_timer_stop(task_timer_handle);
         timer_is_active = false;
     }
-
     return task_stopped;
 }
 
 
-
-
-
-
-
-void deauth_cmd_check(cmd_data_t cmd_data) {
+bool deauth_cmd_check(cmd_data_t cmd_data) {
     uint16_t ap_count = *get_aps_count();
     wifi_ap_record_t *ap_info = get_aps_info();
     int target = cmd_data.param[0];
     int timeout = cmd_data.param[1];
 
     if (!get_scan_status() || !ap_count) {
-        send_cmd_responce("ERROR - no AP's scanned", strlen("ERROR - no AP's scanned"), cmd_data);
-        return;
+        send_error_responce(cmd_data, "no AP's scanned");
+        return false;
     }
-
     if (target > ap_count || target < 0) {
-        send_cmd_responce("ERROR - wrong target (param 0)", strlen("ERROR - wrong target (param 0)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong target (param 0)");
+        return false;        
     }
-
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong timeout (param 1)", strlen("ERROR - wrong timeout (param 1)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong timeout (param 1)");
+        return false;        
     }    
-
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
         timer_is_active = true;
     }
-
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
-    
+    send_responce(cmd_data);
     deauth_attack_start(ap_info + target - 1, 500);
+    return true;
 }
 
-void handshake_cmd_check(cmd_data_t cmd_data) {
+bool handshake_cmd_check(cmd_data_t cmd_data) {
     uint16_t ap_count = *get_aps_count();
     wifi_ap_record_t *ap_info = get_aps_info();
     int target = cmd_data.param[0];
@@ -258,121 +248,105 @@ void handshake_cmd_check(cmd_data_t cmd_data) {
     int method = cmd_data.param[2];
 
     if (!get_scan_status() || !ap_count) {
-        send_cmd_responce("ERROR - no AP's scanned", strlen("ERROR - no AP's scanned"), cmd_data);   
-        return;
+        send_error_responce(cmd_data, "no AP's scanned");
+        return false;
     }
-
     if (target > ap_count || target < 0) {
-        send_cmd_responce("ERROR - wrong target (param 0)", strlen("ERROR - wrong target (param 0)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong target (param 0)");
+        return false;        
     }
-
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong timeout (param 1)", strlen("ERROR - wrong timeout (param 1)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong timeout (param 1)");
+        return false;        
     }    
-
     if (method != (int)METHOD_PASSIVE && method != (int)METHOD_DEAUTH) {
-        send_cmd_responce("ERROR - wrong method (param 2)", strlen("ERROR - wrong method (param 2)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong method (param 2)");
+        return false;        
     }    
-
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
         timer_is_active = true;
     }
-
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
-
+    send_responce(cmd_data);
     handshake_attack_start(ap_info + target - 1, (handshake_method_t) method);
+    return true;
 }
 
-void beacon_cmd_check(cmd_data_t cmd_data) {
+bool beacon_cmd_check(cmd_data_t cmd_data) {
     int timeout = cmd_data.param[0];
 
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong channel (param 0)", strlen("ERROR - wrong channel (param 0)"), cmd_data);    
-        return;        
+        send_error_responce(cmd_data, "wrong channel (param 0)");
+        return false;        
     }    
-
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
         timer_is_active = true;
     }
-
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
-
+    send_responce(cmd_data);
     beacon_attack_start(10);
+    return true;
 }
 
-void pmkid_cmd_check(cmd_data_t cmd_data) {
+bool pmkid_cmd_check(cmd_data_t cmd_data) {
     int timeout = cmd_data.param[0];
 
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong timeout (param 0)", strlen("ERROR - wrong timeout (param 0)"), cmd_data);    
-        return;        
+        send_error_responce(cmd_data, "wrong timeout (param 0)");
+        return false;        
     }    
-
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
         timer_is_active = true;
     }
-
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
-
+    send_responce(cmd_data);
     pmkid_scan_start();
+    return true;
 }
 
-void packet_monitor_cmd_check(cmd_data_t cmd_data) {
+bool packet_monitor_cmd_check(cmd_data_t cmd_data) {
+    uint16_t ap_count = *get_aps_count();
+    wifi_ap_record_t *ap_info = get_aps_info();
     int channel = cmd_data.param[0];
     int filter = cmd_data.param[1];
     int target = cmd_data.param[2];
     int timeout = cmd_data.param[3];
 
-    uint16_t ap_count = *get_aps_count();
-    wifi_ap_record_t *ap_info = get_aps_info();
-
     if (target == EMPTY_PARAM && (channel < MIN_CH || channel > MAX_CH)) {
-        send_cmd_responce("ERROR - wrong channel (param 0)", strlen("ERROR - wrong channel (param 0)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong channel (param 0)");
+        return false;        
     }    
-
     if (filter < MIN_BIT_MASK_FILTER || filter > MAX_BIT_MASK_FILTER) {
-        send_cmd_responce("ERROR - wrong filter (param 1)", strlen("ERROR - wrong filter (param 1)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong filter (param 1)");
+        return false;        
     }    
-
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_cmd_responce("ERROR - wrong timeout (param 3)", strlen("ERROR - wrong timeout (param 3)"), cmd_data);       
-        return;        
+        send_error_responce(cmd_data, "wrong timeout (param 3)"); 
+        return false;        
     }    
-
     if (target != EMPTY_PARAM && (!get_scan_status() || !ap_count)) {
-        send_cmd_responce("ERROR - no AP's scanned", strlen("ERROR - no AP's scanned"), cmd_data);   
-        return;
+        send_error_responce(cmd_data, "no AP's scanned");
+        return false;
     }
-
     if (target != EMPTY_PARAM && (target > ap_count || target < 0)) {
-        send_cmd_responce("ERROR - wrong target (param 2)", strlen("ERROR - wrong target (param 2)"), cmd_data);
-        return;        
+        send_error_responce(cmd_data, "wrong target (param 2)");
+        return false;        
     }
-
     if (timeout != EMPTY_PARAM) {
         ESP_ERROR_CHECK(esp_timer_start_once(task_timer_handle, timeout * 1000000));
         timer_is_active = true;
     }
-
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
-
+    send_responce(cmd_data);
     packet_monitor_start(
         (target == EMPTY_PARAM) ? ((uint8_t)channel) : ((ap_info + (target - 1))->primary), 
         (uint8_t)filter,
         (target == EMPTY_PARAM) ? (NULL) : ((ap_info + (target - 1))->bssid) 
         );
+    return true;
 }
 
 void wifi_scan_responce(cmd_data_t cmd_data) {
-    send_cmd_responce("OK - cmd started", strlen("OK - cmd started"), cmd_data);
+    send_responce(cmd_data);
 
     int msg_len = 0;
     wifi_ap_record_t *ap_info;

@@ -215,8 +215,7 @@ bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool us
 	parser_task_flag = false;
 	osDelay(500 / portTICK_PERIOD_MS);
 
-	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}}, 2000)) {
-		memcpy(error_buff, "Failure while sending STOP_CMD cmd to ESP\0", strlen("Failure while sending STOP_CMD cmd to ESP") + 1);
+	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
 		return false;
 	}
 
@@ -239,9 +238,8 @@ bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool us
 	if (use_target)
 		target = get_target();
 
-	if (!send_cmd_with_check((cmd_data_t){MONITOR_CMD, {ch, filter_mask, target, 0, 0}}, 2000)) {
+	if (!send_cmd_with_check((cmd_data_t){MONITOR_CMD, {ch, filter_mask, target, 0, 0}}, error_buff, 2000)) {
 		SD_unsetup();
-		memcpy(error_buff, "Failure while sending MONITOR_CMD cmd to ESP\0", strlen("Failure while sending MONITOR_CMD cmd to ESP") + 1);
 		return false;
 	}
 
@@ -307,45 +305,45 @@ uint8_t invert_bit(const uint8_t byte, const uint8_t bit)
 
 
 void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint8_t ch, bool sd, bool refresh) {
-	static const uint16_t graphYStart = TITLE_END_Y + 9;
+	static const uint16_t YStart = TITLE_END_Y + 9;
 	static const uint16_t MAX_DISP_PKTS = 80;
 	static char buff[30] = {};
 	static uint32_t everage_ps = 0;
 
 	if (refresh) {
-		drawRect(6, graphYStart + 10, PKT_TIME_SEC * 2 + 2, MAX_DISP_PKTS + 2, MAIN_TXT_COLOR);
-		drawFastVLine(7, graphYStart + 10 + MAX_DISP_PKTS + 2, 6, MAIN_TXT_COLOR);
+		drawRect(6, YStart + 10, PKT_TIME_SEC * 2 + 2, MAX_DISP_PKTS + 2, MAIN_TXT_COLOR);
+		drawFastVLine(7, YStart + 10 + MAX_DISP_PKTS + 2, 6, MAIN_TXT_COLOR);
 		for (uint16_t i = 10; i <= PKT_TIME_SEC * 2; i += 10)
 			if (i % 60 == 0)
-				drawFastVLine(6 + i, graphYStart + 10 + MAX_DISP_PKTS + 2, 6, MAIN_TXT_COLOR);
+				drawFastVLine(6 + i, YStart + 10 + MAX_DISP_PKTS + 2, 6, MAIN_TXT_COLOR);
 			else
-				drawFastVLine(6 + i, graphYStart + 10 + MAX_DISP_PKTS + 2, 3, MAIN_TXT_COLOR);
+				drawFastVLine(6 + i, YStart + 10 + MAX_DISP_PKTS + 2, 3, MAIN_TXT_COLOR);
 
-		drawFastHLine(3, graphYStart + 10 + MAX_DISP_PKTS, 3, MAIN_TXT_COLOR);
+		drawFastHLine(3, YStart + 10 + MAX_DISP_PKTS, 3, MAIN_TXT_COLOR);
 		for (uint16_t i = 40; i <= MAX_DISP_PKTS; i += 40)
-			drawFastHLine(3, graphYStart + 10 + MAX_DISP_PKTS + 1 - i, 3, MAIN_TXT_COLOR);
+			drawFastHLine(3, YStart + 10 + MAX_DISP_PKTS + 1 - i, 3, MAIN_TXT_COLOR);
 
-		ST7735_WriteString(5, graphYStart, "80 p/s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(0, graphYStart + 100, "-1s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(56, graphYStart + 100, "-30s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(107, graphYStart + 100, "-60s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(5, YStart, "80 p/s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(0, YStart + 100, "-1s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(56, YStart + 100, "-30s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(107, YStart + 100, "-60s", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		if (sd) {
-			fillRoundRect(44, graphYStart + 125, 40, 13, 5, MAIN_TXT_COLOR);
-			ST7735_WriteString(49, graphYStart + 128, "use SD", Font_5x7, MAIN_BG_COLOR, MAIN_TXT_COLOR);
+			fillRoundRect(44, YStart + 125, 40, 13, 5, MAIN_TXT_COLOR);
+			ST7735_WriteString(49, YStart + 128, "use SD", Font_5x7, MAIN_BG_COLOR, MAIN_TXT_COLOR);
 		} else {
-			fillRoundRect(44, graphYStart + 125, 40, 13, 5, MAIN_BG_COLOR);
-			drawRoundRect(44, graphYStart + 125, 40, 13, 5, MAIN_TXT_COLOR);
-			ST7735_WriteString(49, graphYStart + 128, "use SD", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+			fillRoundRect(44, YStart + 125, 40, 13, 5, MAIN_BG_COLOR);
+			drawRoundRect(44, YStart + 125, 40, 13, 5, MAIN_TXT_COLOR);
+			ST7735_WriteString(49, YStart + 128, "use SD", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		}
 	}
 
-	uint16_t y_line_start = graphYStart + 11 + MAX_DISP_PKTS;
+	uint16_t y_line_start = YStart + 11 + MAX_DISP_PKTS;
 	uint16_t ps = 0;
 	everage_ps = 0;
 	for (uint16_t i = 0; i < PKT_TIME_SEC; i++) {
 		ps = pktPerSecData[i];
-		drawFastVLine(7 + i * 2, graphYStart + 11, MAX_DISP_PKTS, MAIN_BG_COLOR);
-		drawFastVLine(7 + i * 2 + 1, graphYStart + 11, MAX_DISP_PKTS, MAIN_BG_COLOR);
+		drawFastVLine(7 + i * 2, YStart + 11, MAX_DISP_PKTS, MAIN_BG_COLOR);
+		drawFastVLine(7 + i * 2 + 1, YStart + 11, MAX_DISP_PKTS, MAIN_BG_COLOR);
 		if (ps) {
 			if (ps > MAX_DISP_PKTS)
 				ps = MAX_DISP_PKTS;
@@ -359,13 +357,13 @@ void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t ma
 	}
 
 	sprintf(buff, "ch:%2u", ch % 100);
-	ST7735_WriteString(100, graphYStart, buff, Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+	ST7735_WriteString(100, YStart, buff, Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 	sprintf(buff, "p/s:%3u,Mp/s:%3u,Ep/s:%3lu", pktPerSecData[0] % 1000, maxPktPerSecData % 10000, (everage_ps / PKT_TIME_SEC) % 1000);
-	ST7735_WriteString(2, graphYStart + 112, buff, Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+	ST7735_WriteString(2, YStart + 112, buff, Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 }
 
 void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uint8_t filter_mask, bool button, bool use_target, bool full_update) {
-	const uint16_t graphYStart = TITLE_END_Y + 9;
+	const uint16_t YStart = TITLE_END_Y + 9;
 	char buffer[35] = {};
 	static uint8_t prev_set;
 	static uint8_t prev_mask_set;
@@ -375,12 +373,12 @@ void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uin
 	static bool prev_use_target;
 
 	if (full_update || prev_button != button) {
-		drawIcon("parameters", !button, 4, graphYStart, 125, graphYStart + 100, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		drawIcon("parameters", !button, 4, YStart, 125, YStart + 100, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		darwMiddleButton("restart", 142, Font_7x10, button, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 	}
 
 	if (prev_use_target != use_target)
-		fillRect(10, graphYStart + 72, ST7735_WIDTH - 20, 24, MAIN_BG_COLOR);
+		fillRect(10, YStart + 72, ST7735_WIDTH - 20, 24, MAIN_BG_COLOR);
 
 	if (full_update ||
 		prev_filter_mask != filter_mask ||
@@ -391,30 +389,30 @@ void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uin
 	) {
 		ST7735_WriteString(
 				(ST7735_WIDTH - strlen(" sniffer filter ") * 7) / 2,
-				graphYStart + 20,
+				YStart + 20,
 				(set == 0 && !button) ? ">sniffer filter<" : " sniffer filter ",
 				Font_7x10,
 				MAIN_TXT_COLOR,
 				MAIN_BG_COLOR
 				);
-		drawFastHLine(7, graphYStart + 46, 114, MAIN_TXT_COLOR);
-		drawFastVLine(45, graphYStart + 35, 23, MAIN_TXT_COLOR);
-		drawFastVLine(85, graphYStart + 35, 23, MAIN_TXT_COLOR);
-		ST7735_WriteString(10, graphYStart + 35, "data", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(52, graphYStart + 35, "mgmt", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		ST7735_WriteString(92, graphYStart + 35, "ctrl", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		drawFastHLine(7, YStart + 46, 114, MAIN_TXT_COLOR);
+		drawFastVLine(45, YStart + 35, 23, MAIN_TXT_COLOR);
+		drawFastVLine(85, YStart + 35, 23, MAIN_TXT_COLOR);
+		ST7735_WriteString(10, YStart + 35, "data", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(52, YStart + 35, "mgmt", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		ST7735_WriteString(92, YStart + 35, "ctrl", Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		sprintf(buffer, "%c", filter_mask & 0b00000100 ? '1' : '0'); //data
-		ST7735_WriteString(20, graphYStart + 49, buffer, Font_7x10,
+		ST7735_WriteString(20, YStart + 49, buffer, Font_7x10,
 				(mask_set == 0 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 				(mask_set == 0 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
 				);
 		sprintf(buffer, "%c", filter_mask & 0b00000010 ? '1' : '0'); //mgmt
-		ST7735_WriteString(62, graphYStart + 49, buffer, Font_7x10,
+		ST7735_WriteString(62, YStart + 49, buffer, Font_7x10,
 				(mask_set == 1 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 				(mask_set == 1 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
 				);
 		sprintf(buffer, "%c", filter_mask & 0b00000001 ? '1' : '0'); //ctrl
-		ST7735_WriteString(102, graphYStart + 49, buffer, Font_7x10,
+		ST7735_WriteString(102, YStart + 49, buffer, Font_7x10,
 				(mask_set == 2 && set == 0 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 				(mask_set == 2 && set == 0 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
 				);
@@ -424,24 +422,24 @@ void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uin
 		if (use_target && get_target() != -1) {
 			ST7735_WriteString(
 					(ST7735_WIDTH - strlen(" target ") * 7) / 2,
-					graphYStart + 72,
+					YStart + 72,
 					(set == 1 && !button) ? ">target<" : " target ",
 					Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
 					);
 			char *target_ssid = *(get_AP_list() + (get_target() - 1)) + 1;
-			ST7735_WriteString((128 - (strlen(target_ssid) - 1) * 7) / 2, graphYStart + 84, target_ssid, Font_7x10,
+			ST7735_WriteString((128 - (strlen(target_ssid) - 1) * 7) / 2, YStart + 84, target_ssid, Font_7x10,
 					(set == 1 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 					(set == 1 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
 					);
 		} else {
 			ST7735_WriteString(
 					(ST7735_WIDTH - strlen(" channel ") * 7) / 2,
-					graphYStart + 72,
+					YStart + 72,
 					(set == 1 && !button) ? ">channel<" : " channel ",
 					Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
 					);
 			sprintf(buffer, "%02d", ch);
-			ST7735_WriteString(57, graphYStart + 84, buffer, Font_7x10,
+			ST7735_WriteString(57, YStart + 84, buffer, Font_7x10,
 					(set == 1 && !button) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 					(set == 1 && !button) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
 					);

@@ -61,7 +61,7 @@ uint16_t get_recieved_pkts_count();
 
 ring_buffer_t *get_ring_buff();
 
-bool send_cmd_with_check(cmd_data_t cmd_data, uint32_t timeout_ms);
+bool send_cmd_with_check(cmd_data_t cmd_data, char *error_buff, uint32_t timeout_ms);
 
 void send_cmd_without_check(cmd_data_t cmd_data);
 

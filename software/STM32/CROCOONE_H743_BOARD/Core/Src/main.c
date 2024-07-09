@@ -37,15 +37,17 @@
 #include "ch_analyzer.h"
 #include "PMKID_attack.h"
 #include "wifi_scan.h"
+#include "deauth_attack.h"
 #include "title.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 static int curr_set = 0;
-static const int set_count = 5;
+static const int set_count = 6;
 static bool clear = 1;
 static bool screen_update = 1;
+static eButtonEvent button_up, button_down, button_confirm;
 
 SemaphoreHandle_t SPI2_mutex;
 /* USER CODE END PTD */
@@ -799,11 +801,15 @@ void StartDefaultTask(void *argument)
 
   /* Infinite loop */
   while (1) {
-	if (GetButtonState(BUTTON_DOWN) == SINGLE_CLICK) {
+	button_up = GetButtonState(BUTTON_UP);
+	button_down = GetButtonState(BUTTON_DOWN);
+	button_confirm = GetButtonState(BUTTON_CONFIRM);
+
+	if (button_down == SINGLE_CLICK || button_down == HOLD) {
 		curr_set = (curr_set + 1) % set_count;
 		screen_update = 1;
 	}
-	if (GetButtonState(BUTTON_UP) == SINGLE_CLICK) {
+	if (button_up == SINGLE_CLICK || button_up == HOLD) {
 		curr_set = (curr_set - 1) % set_count;
 		if (curr_set < 0) curr_set = set_count;
 		screen_update = 1;
@@ -818,12 +824,12 @@ void StartDefaultTask(void *argument)
 	}
 
 	if (screen_update) {
-		drawMenu((char * []) {"Wi-Fi scan","Ch Analyzer", "Pkt Analyzer", "PMKID attack", "power off"}, set_count, 5, 30, 123, 159, curr_set, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		drawMenu((char * []) {"Wi-Fi scan","Ch Analyzer", "Pkt Analyzer", "PMKID attack", "deauth", "power off"}, set_count, 5, 30, 123, 159, curr_set, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		screen_update = 0;
 	}
 	xSemaphoreGive(SPI2_mutex);
 
-	if (GetButtonState(BUTTON_CONFIRM) == SINGLE_CLICK) {
+	if (button_confirm == SINGLE_CLICK) {
 		if (curr_set == 0)
 			ESP32_scan_wifi((TaskHandle_t *)&defaultTaskHandle);
 		else if (curr_set == 1)
@@ -832,6 +838,8 @@ void StartDefaultTask(void *argument)
 			ESP32_start_packet_monitor((TaskHandle_t *)&defaultTaskHandle);
 		else if (curr_set == 3)
 			ESP32_start_pmkid_attack((TaskHandle_t *)&defaultTaskHandle);
+		else if (curr_set == 4)
+			ESP32_start_deauth_attack((TaskHandle_t *)&defaultTaskHandle);
 		else {
 			HAL_GPIO_WritePin(LCD_LIGHT_GPIO_Port, LCD_LIGHT_Pin, GPIO_PIN_RESET);
 		  	HAL_GPIO_WritePin(POWER_ON_GPIO_Port, POWER_ON_Pin, GPIO_PIN_RESET); //power off

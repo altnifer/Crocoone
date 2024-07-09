@@ -148,10 +148,7 @@ int get_target() {
 }
 
 bool start_scan(uint32_t timeout, char *error_buff) {
-	if (!send_cmd_with_check((cmd_data_t){SCAN_CMD, {0,0,0,0,0}}, 2000)){
-		memcpy(error_buff,
-			   "failure while sending WIFI_SCAN cmd (right button to quit)",
-			   strlen("failure while sending WIFI_SCAN cmd (right button to quit)") + 1);
+	if (!send_cmd_with_check((cmd_data_t){SCAN_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
 		return false;
 	}
 
