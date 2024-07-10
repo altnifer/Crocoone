@@ -14,12 +14,12 @@ static SemaphoreHandle_t IDLE_semaphore;
 static SemaphoreHandle_t UART_ringBuffer_mutex;
 static SemaphoreHandle_t ESP_UART_mutex;
 static BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-
 static ring_buffer_t ring_buffer;
 static uint8_t rx_buff[RX_BUFF_SIZE] = {};
 static uint8_t tx_buff[TX_BUFF_SIZE] = {};
 static uint16_t pkts_recieved = 0;
 static uint16_t last_pkt_size = 0;
+static uint32_t last_send_time_ms = 0;
 
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff);
 void IDLE_ISR_handler_task(void * args);
@@ -87,13 +87,19 @@ uint16_t get_recieved_pkts_count() {
 }
 
 bool send_cmd_with_check(cmd_data_t cmd_data, char *error_buff, uint32_t timeout_ms) {
-	vTaskDelay(MIN_TIMEOUT_BETWEEN_SEND_MS / portTICK_PERIOD_MS);
+	bool ret_val = false;
+
+	uint32_t timeout_between_last_send = HAL_GetTick() - last_send_time_ms;
+	if (timeout_between_last_send < MIN_TIMEOUT_BETWEEN_SEND_MS)
+		vTaskDelay(timeout_between_last_send / portTICK_PERIOD_MS);
 
 	xSemaphoreTake(UART_ringBuffer_mutex, portMAX_DELAY);
 	ringBuffer_clear(&ring_buffer);
 
 	pkts_recieved = 0;
 	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)(tx_buff));
+	memcpy(error_buff, (char *)(tx_buff), cmd_len);
+	memcpy(error_buff + cmd_len, " ", 2);
 
 	xSemaphoreTake(ESP_UART_mutex, portMAX_DELAY);
 	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff, cmd_len, 100);
@@ -118,9 +124,9 @@ bool send_cmd_with_check(cmd_data_t cmd_data, char *error_buff, uint32_t timeout
 				(uint8_t *)" - cmd accepted and started",
 				strlen(" - cmd accepted and started")
 		) != -1) {
-			xSemaphoreGive(UART_ringBuffer_mutex);
-			return true;
+			ret_val = true;
 		}
+
 
 		uint16_t error_responce_len = strlen(" - cmd accepted with error: ");
 		if (ringBuffer_findSequence(&ring_buffer,
@@ -129,29 +135,34 @@ bool send_cmd_with_check(cmd_data_t cmd_data, char *error_buff, uint32_t timeout
 		) != -1) {
 			ringBuffer_clearNBytes(&ring_buffer, msg_start + cmd_len + error_responce_len);
 			int32_t erro_msg_len = ringBuffer_findSequence(&ring_buffer, (uint8_t *)"\n", 1);
-			ringBuffer_get(&ring_buffer, (uint8_t *)error_buff, erro_msg_len);
-			xSemaphoreGive(UART_ringBuffer_mutex);
-			return false;
+			ringBuffer_get(&ring_buffer, (uint8_t *)(error_buff + cmd_len + 1), erro_msg_len);
+			error_buff[erro_msg_len + cmd_len + 1] = '\0';
+			ret_val = false;
 		}
 
+		last_send_time_ms = HAL_GetTick();
 		xSemaphoreGive(UART_ringBuffer_mutex);
-		break;
+		return ret_val;
 	}
 
-	memcpy(error_buff, "no response", strlen("no response") + 1);
-	return false;
+	memcpy(error_buff + cmd_len + 1, "no response", strlen("no response") + 1);
+	return ret_val;
 }
 
 void send_cmd_without_check(cmd_data_t cmd_data) {
-	vTaskDelay(MIN_TIMEOUT_BETWEEN_SEND_MS / portTICK_PERIOD_MS);
+	uint32_t timeout_between_last_send = HAL_GetTick() - last_send_time_ms;
+	if (timeout_between_last_send < MIN_TIMEOUT_BETWEEN_SEND_MS)
+		vTaskDelay(timeout_between_last_send / portTICK_PERIOD_MS);
 
 	uint16_t cmd_len = add_cmd_to_buff(cmd_data, (char *)tx_buff);
 
 	xSemaphoreTake(ESP_UART_mutex, portMAX_DELAY);
-	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff, cmd_len, 500);
+	HAL_UART_Transmit(&ESP32_AT_UART_Port, tx_buff, cmd_len, 100);
 	HAL_UARTEx_ReceiveToIdle_DMA(&ESP32_AT_UART_Port, rx_buff, RX_BUFF_SIZE);
 	__HAL_DMA_DISABLE_IT(&ESP32_UART_DMA_LINE, DMA_IT_HT);
 	xSemaphoreGive(ESP_UART_mutex);
+
+	last_send_time_ms = HAL_GetTick();
 }
 
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff) {
