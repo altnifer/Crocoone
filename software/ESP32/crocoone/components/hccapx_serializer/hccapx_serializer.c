@@ -275,7 +275,5 @@ void hccapx_serializer_add_frame(data_frame_t *frame){
     } 
     else if(memcmp(frame->mac_header.addr1, frame->mac_header.addr3, 6) == 0){
         sta_message(frame, eapol_packet, eapol_key_packet);
-    } 
-    else {
     }
 }

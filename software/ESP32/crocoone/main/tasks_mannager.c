@@ -5,7 +5,6 @@
 #include "attack_deauth.h"
 #include "attack_beacon.h"
 #include "hccapx_serializer.h"
-#include "pcap_serializer.h"
 #include "attack_pmkid.h"
 #include "packet_monitor.h"
 #include "data_converter.h"
@@ -180,6 +179,12 @@ bool start_task(cmd_data_t cmd_data) {
         cmd_started = pmkid_cmd_check(cmd_data);
     } else if (!strcmp(cmd_data.cmdName, MONITOR_CMD)) {
         cmd_started = packet_monitor_cmd_check(cmd_data);
+    } else if (!strcmp(cmd_data.cmdName, HCCAPX_CMD)) {
+        send_responce(cmd_data);
+        handshake_get_hccapx_data();
+    } else if (!strcmp(cmd_data.cmdName, HC22000_CMD)) {
+        send_responce(cmd_data);
+        handshake_get_hc22000_data();
     } else if (!strcmp(cmd_data.cmdName, STOP_CMD)) {
         send_responce(cmd_data);
     } else {
@@ -244,8 +249,9 @@ bool handshake_cmd_check(cmd_data_t cmd_data) {
     uint16_t ap_count = *get_aps_count();
     wifi_ap_record_t *ap_info = get_aps_info();
     int target = cmd_data.param[0];
-    int timeout = cmd_data.param[1];
-    int method = cmd_data.param[2];
+    int method = cmd_data.param[1];
+    int send_pcap = cmd_data.param[2];
+    int timeout = cmd_data.param[3];
 
     if (!get_scan_status() || !ap_count) {
         send_error_responce(cmd_data, "no AP's scanned");
@@ -256,11 +262,15 @@ bool handshake_cmd_check(cmd_data_t cmd_data) {
         return false;        
     }
     if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
-        send_error_responce(cmd_data, "wrong timeout (param 1)");
+        send_error_responce(cmd_data, "wrong timeout (param 3)");
         return false;        
     }    
     if (method != (int)METHOD_PASSIVE && method != (int)METHOD_DEAUTH) {
-        send_error_responce(cmd_data, "wrong method (param 2)");
+        send_error_responce(cmd_data, "wrong method (param 1)");
+        return false;        
+    }    
+    if (send_pcap != true && send_pcap != false) {
+        send_error_responce(cmd_data, "wrong send pcap flag (param 2)");
         return false;        
     }    
     if (timeout != EMPTY_PARAM) {
@@ -268,7 +278,7 @@ bool handshake_cmd_check(cmd_data_t cmd_data) {
         timer_is_active = true;
     }
     send_responce(cmd_data);
-    handshake_attack_start(ap_info + target - 1, (handshake_method_t) method);
+    handshake_attack_start(ap_info + target - 1, (handshake_method_t)method, (bool)send_pcap);
     return true;
 }
 

@@ -23,10 +23,16 @@ bool eeprom_init(void) {
 			return false;
 
 		buff = 0;
-		if (!at24_write(EEPROM_PCAP_ADDR, (uint8_t *)&buff, 4))
+		if (!at24_write(EEPROM_PMKID_ADDR, (uint8_t *)&buff, 4))
 			return false;
 
-		if (!at24_write(EEPROM_PMKID_ADDR, (uint8_t *)&buff, 4))
+		if (!at24_write(EEPROM_MONITOR_PCAP_ADDR, (uint8_t *)&buff, 4))
+			return false;
+
+		if (!at24_write(EEPROM_HANDSHAKE_PCAP_ADDR, (uint8_t *)&buff, 4))
+			return false;
+
+		if (!at24_write(EEPROM_HANDSHAKE_HC22000_ADDR, (uint8_t *)&buff, 4))
 			return false;
 	}
 

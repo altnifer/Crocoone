@@ -39,13 +39,14 @@
 #include "wifi_scan.h"
 #include "deauth_attack.h"
 #include "beacon_attack.h"
+#include "handshake_attack.h"
 #include "title.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 static int curr_set = 0;
-static const int set_count = 7;
+static const int set_count = 8;
 static bool clear = 1;
 static bool screen_update = 1;
 static eButtonEvent button_up, button_down, button_confirm;
@@ -825,7 +826,7 @@ void StartDefaultTask(void *argument)
 	}
 
 	if (screen_update) {
-		drawMenu((char * []) {"Wi-Fi scan","Ch Analyzer", "Pkt Analyzer", "PMKID attack", "deauth", "beacon", "power off"}, set_count, 5, 30, 123, 159, curr_set, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		drawMenu((char * []) {"Wi-Fi scan","Ch Analyzer", "Pkt Analyzer", "PMKID attack", "deauth", "beacon", "handshake", "power off"}, set_count, 5, 30, 123, 159, curr_set, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		screen_update = 0;
 	}
 	xSemaphoreGive(SPI2_mutex);
@@ -843,6 +844,8 @@ void StartDefaultTask(void *argument)
 			ESP32_start_deauth_attack((TaskHandle_t *)&defaultTaskHandle);
 		else if (curr_set == 5)
 			ESP32_start_beacon_attack((TaskHandle_t *)&defaultTaskHandle);
+		else if (curr_set == 6)
+			ESP32_start_handshake_attack((TaskHandle_t *)&defaultTaskHandle);
 		else {
 			HAL_GPIO_WritePin(LCD_LIGHT_GPIO_Port, LCD_LIGHT_Pin, GPIO_PIN_RESET);
 		  	HAL_GPIO_WritePin(POWER_ON_GPIO_Port, POWER_ON_Pin, GPIO_PIN_RESET); //power off

@@ -10,7 +10,7 @@
 
 void UART_init();
 
-int UART_write (const void *src, size_t size);
+int UART_write(const void *src, size_t size);
 
 int UART_read(char *data_buff, unsigned int len);
 

@@ -68,8 +68,8 @@ void deauth_attack_main_task(void *main_task_handle) {
 			break; //exit
 		}
 		if (button_down == DOUBLE_CLICK || button_up == DOUBLE_CLICK) button = !button;
-		if (button_right == SINGLE_CLICK || button_right == HOLD) timeout++;
-		if (button_left == SINGLE_CLICK || button_left == HOLD) timeout--;
+		if ((button_right == SINGLE_CLICK || button_right == HOLD) && target_is_ok) timeout++;
+		if ((button_left == SINGLE_CLICK || button_left == HOLD) && target_is_ok) timeout--;
 		if (button_confirm == SINGLE_CLICK && target_is_ok && button) button_confirm_flag = true;
 	//
 
@@ -132,7 +132,7 @@ void deauth_attack_main_task(void *main_task_handle) {
 
 static void darw_settings_page(uint8_t timeout, bool button_state, bool full_refresh) {
 	const uint16_t YStart = TITLE_END_Y + 9;
-	char str[20] = {};
+	char temp_buff[20] = {};
 	bool target_is_ok = get_target() != -1;
 	button_state = button_state && target_is_ok;
 	static uint8_t prev_timeout_len = 0;
@@ -183,17 +183,17 @@ static void darw_settings_page(uint8_t timeout, bool button_state, bool full_ref
 				Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
 		);
 		if (!timeout)
-			memcpy(str, "none", 5);
+			memcpy(temp_buff, "none", 5);
 		else
-			sprintf(str, "%hu", timeout);
-		uint8_t timeout_len = strlen(str);
+			sprintf(temp_buff, "%hu", timeout);
+		uint8_t timeout_len = strlen(temp_buff);
 		if (prev_timeout_len != timeout_len)
 			fillRect(46, YStart + 66, 35, 10, MAIN_BG_COLOR);
 		prev_timeout_len = timeout_len;
 		ST7735_WriteString(
-				(ST7735_WIDTH - strlen(str) * 7) / 2,
+				(ST7735_WIDTH - strlen(temp_buff) * 7) / 2,
 				YStart + 66,
-				str,
+				temp_buff,
 				Font_7x10,
 				(!button_state) ? MAIN_BG_COLOR : MAIN_TXT_COLOR,
 				(!button_state) ? MAIN_TXT_COLOR : MAIN_BG_COLOR
@@ -210,7 +210,7 @@ static void darw_settings_page(uint8_t timeout, bool button_state, bool full_ref
 
 static void darw_running_page(uint16_t seconds_left, uint16_t timeout, bool button_state, bool full_refresh) {
 	const uint16_t YStart = 20;
-	char str[20] = {};
+	char temp_buff[20] = {};
 	static uint8_t prev_seconds_left = 0;
 	static bool prev_button_state = false;
 	static uint8_t prev_timeout_len = 0;
@@ -232,17 +232,17 @@ static void darw_running_page(uint16_t seconds_left, uint16_t timeout, bool butt
 
 	if (full_refresh || prev_seconds_left != seconds_left) {
 		if (!timeout)
-			memcpy(str, "none", 5);
+			memcpy(temp_buff, "none", 5);
 		else
-			sprintf(str, "%hu/%hu", seconds_left, timeout);
-		uint8_t timeout_len = strlen(str);
+			sprintf(temp_buff, "%hu/%hu", seconds_left, timeout);
+		uint8_t timeout_len = strlen(temp_buff);
 		if (prev_timeout_len != timeout_len)
 			fillRect(10, YStart + 44, 108, 10, MAIN_BG_COLOR);
 		prev_timeout_len = timeout_len;
 		ST7735_WriteString(
-				(ST7735_WIDTH - strlen(str) * 7) / 2,
+				(ST7735_WIDTH - strlen(temp_buff) * 7) / 2,
 				YStart + 44,
-				str,
+				temp_buff,
 				Font_7x10,
 				MAIN_TXT_COLOR,
 				MAIN_BG_COLOR

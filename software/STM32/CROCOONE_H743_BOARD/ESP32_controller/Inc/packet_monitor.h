@@ -13,9 +13,6 @@
 #include "cmsis_os.h"
 #include "semphr.h"
 
-#define MONITOR_BUFF_LEN 4096
-#define FRAME_HEADER_LEN 34
-
 #define PKT_TIME_SEC 60
 #define MAX_WIFI_CH  13
 #define MIN_WIFI_CH  1

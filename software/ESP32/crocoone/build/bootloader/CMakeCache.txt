@@ -248,7 +248,7 @@ IDF_TOOLCHAIN:STRING=gcc
 PROJECT_SOURCE_DIR:UNINITIALIZED=D:/Users/nikita/Documents/crocoone
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=D:/DATA/Program/Espressif/python_env/idf5.0_py3.11_env/Scripts/python.exe
+PYTHON:UNINITIALIZED=D:/DATA/Program/Espressif/python_env/idf5.1_py3.11_env/Scripts/python.exe
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1

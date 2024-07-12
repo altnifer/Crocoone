@@ -14,19 +14,14 @@
 #include "button.h"
 #include "wifi_scan.h"
 #include "title.h"
+#include "pcap_parser.h"
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
 
-static uint32_t pktsSumm = 0;
-static bool parser_task_flag;
-static bool parser_use_sd_flag;
-static bool SD_write_error;
 extern SemaphoreHandle_t SPI2_mutex;
 
 void packet_monitor_main_task(void *main_task_handle);
-bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff);
-void packet_parser_task(void *args);
+bool packet_monitor_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff);
 uint8_t invert_bit(const uint8_t byte, const uint8_t bit);
 void draw_packet_monitor_garph(uint16_t pktPerSecData[PKT_TIME_SEC], uint16_t maxPktPerSecData, uint8_t ch, bool sd, bool refresh);
 void draw_packet_monitor_settings(uint8_t set, uint8_t mask_set, uint8_t ch, uint8_t filter_mask, bool button, bool use_target, bool full_update);
@@ -54,14 +49,14 @@ void packet_monitor_main_task(void *main_task_handle) {
 	bool full_update_screen = true;
 	bool restart_monitor = true;
 	bool use_target_flag = false;
-	pktsSumm = 0;
-	SD_write_error = false;
 
+	pcap_parser_stop();
+	pcap_parser_set_use_sd_flag(false);
 	ClearAllButtons();
 	update_title_text("monitor");
 
 	while (1) {
-	//drawing on display
+		//drawing on display
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
 		update_title_SD_flag(use_sd);
 		if (full_update_screen) {
@@ -74,16 +69,14 @@ void packet_monitor_main_task(void *main_task_handle) {
 			draw_packet_monitor_settings(set, mask_set, ch_temp, filter_mask_temp, button_flag, use_target_flag, full_update_screen);
 		full_update_screen = false;
 		xSemaphoreGive(SPI2_mutex);
-	//
 
-	//buttons handling
+		//buttons handling
 		//get buttons states
 		button_right = GetButtonState(BUTTON_RIGHT);
 		button_left = GetButtonState(BUTTON_LEFT);
 		button_up = GetButtonState(BUTTON_UP);
 		button_down = GetButtonState(BUTTON_DOWN);
 		button_confirm = GetButtonState(BUTTON_CONFIRM);
-		//
 
 		//handling common buttons
 		if (button_left == DOUBLE_CLICK && !use_sd) {
@@ -99,7 +92,6 @@ void packet_monitor_main_task(void *main_task_handle) {
 			exit_with_error = false;
 			break; //exit
 		}
-		//
 
 		//handling buttons on the graph page
 		if (button_confirm == SINGLE_CLICK && graph_page) {
@@ -107,7 +99,6 @@ void packet_monitor_main_task(void *main_task_handle) {
 			restart_monitor = true;
 			full_update_screen = true;
 		}
-		//
 
 		//handling buttons on the settings page
 		if (!graph_page && button_confirm == SINGLE_CLICK && set == 0 && mask_set == 0)
@@ -151,12 +142,10 @@ void packet_monitor_main_task(void *main_task_handle) {
 		}
 
 		if (!graph_page && (button_up == DOUBLE_CLICK || button_down == DOUBLE_CLICK)) button_flag = !button_flag;
-		//
-	//
 
-	//monitor control
+		//monitor control
 		if (restart_monitor) {
-			if (!packet_parser_restart(use_sd, ch_temp, filter_mask_temp, use_target_flag, error_buff)) break;
+			if (!packet_monitor_restart(use_sd, ch_temp, filter_mask_temp, use_target_flag, error_buff)) break;
 			filter_mask = filter_mask_temp;
 			ch = ch_temp;
 			restart_monitor = false;
@@ -165,29 +154,26 @@ void packet_monitor_main_task(void *main_task_handle) {
 		if (HAL_GetTick() - ticks > 1000) {
 			for (int i = PKT_TIME_SEC - 1; i > 0; i--)
 				pktPerSec[ch - 1][i] = pktPerSec[ch - 1][i-1];
-			pktPerSec[ch - 1][0] = pktsSumm;
-			if (pktsSumm > maxPktPerSec[ch - 1])
-				maxPktPerSec[ch - 1] = pktsSumm;
-			pktsSumm = 0;
+			pktPerSec[ch - 1][0] = get_pkts_sum();
+			if (pktPerSec[ch - 1][0] > maxPktPerSec[ch - 1])
+				maxPktPerSec[ch - 1] = pktPerSec[ch - 1][0];
 			ticks = HAL_GetTick();
 		}
 
-		if (SD_write_error){
+		if (check_sd_write_error()){
 			sprintf(error_buff, "SD write error");
 			break;
 		}
-	//
 
 		osDelay(250 / portTICK_PERIOD_MS);
 	}
 
-//monitor deinit
+	//monitor deinit
 	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
-	parser_task_flag = false;
+	pcap_parser_stop();
 	update_title_SD_flag(false);
-//
 
-//error handling
+	//error handling
 	if (exit_with_error) {
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
 		drawErrorIcon(error_buff, strlen(error_buff), MAIN_ERROR_COLOR, MAIN_BG_COLOR);
@@ -199,30 +185,28 @@ void packet_monitor_main_task(void *main_task_handle) {
 			if (GetButtonState(BUTTON_RIGHT) == DOUBLE_CLICK) break;
 		}
 	}
-//
 
-//resume main task
+	//resume main task
 	vTaskResume(*((TaskHandle_t *)main_task_handle));
 	vTaskDelete(NULL);
-//
 }
 
-bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff) {
+bool packet_monitor_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff) {
 	FRESULT sd_setup_error_code;
 	uint32_t file_num;
 	char file_name[strlen(MONITOR_FILE_NAME) + 18];
 
-	parser_task_flag = false;
+	pcap_parser_stop();
 	osDelay(500 / portTICK_PERIOD_MS);
 
 	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
 		return false;
 	}
 
-	parser_use_sd_flag = false;
+	pcap_parser_set_use_sd_flag(false);
 
 	if (use_sd) {
-		eeprom_read_set(EEPROM_PCAP_ADDR, &file_num);
+		eeprom_read_set(EEPROM_MONITOR_PCAP_ADDR, &file_num);
 		sprintf(file_name, "%s_%lu.pcap", MONITOR_FILE_NAME, file_num);
 		sd_setup_error_code = SD_setup(file_name, MONITOR_FOLDER_NAME, 12);
 		if (sd_setup_error_code != FR_OK) {
@@ -230,8 +214,8 @@ bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool us
 			return false;
 		}
 		file_num++;
-		eeprom_write_set(EEPROM_PCAP_ADDR, &file_num);
-		parser_use_sd_flag = true;
+		eeprom_write_set(EEPROM_MONITOR_PCAP_ADDR, &file_num);
+		pcap_parser_set_use_sd_flag(true);
 	}
 
 	int target = 0;
@@ -243,58 +227,9 @@ bool packet_parser_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool us
 		return false;
 	}
 
-	parser_task_flag = true;
-	xTaskCreate(packet_parser_task, "monitor_parser", 1024 * 4, NULL, osPriorityNormal2, NULL);
+	pcap_parser_start();
 
 	return true;
-}
-
-void packet_parser_task(void *args) {
-	static uint8_t packet_header[FRAME_HEADER_LEN + 1];
-	ring_buffer_t *uart_ring_buffer = get_ring_buff();
-	UART_ringBuffer_mutex_take();
-	ringBuffer_clear(uart_ring_buffer);
-	UART_ringBuffer_mutex_give();
-
-	while (parser_task_flag) {
-		osDelay(50 / portTICK_PERIOD_MS);
-
-		UART_ringBuffer_mutex_take();
-		for (uint16_t i = 0; i < get_recieved_pkts_count(); i++) {
-			int32_t packet_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"PCAP data (", 11);
-			if (packet_start == -1) {
-				ringBuffer_clear(uart_ring_buffer);
-				break;
-			}
-
-			ringBuffer_clearNBytes(uart_ring_buffer, (uint16_t)packet_start);
-
-			ringBuffer_get(uart_ring_buffer, packet_header, FRAME_HEADER_LEN);
-
-			ringBuffer_clearNBytes(uart_ring_buffer, FRAME_HEADER_LEN);
-
-			uint16_t pkts = 0, bytes = 0;
-			packet_header[FRAME_HEADER_LEN] = '\0';
-			if (!sscanf((char *)packet_header, "PCAP data (%hu pkts, %hu bytes): ", &pkts, &bytes)) break;
-
-			pktsSumm += pkts;
-
-			if (parser_use_sd_flag)
-				copy_ringBuff_to_SD_buff(uart_ring_buffer, bytes);
-		}
-		UART_ringBuffer_mutex_give();
-
-		if ((SD_write_error = !SD_write_from_ringBuff()) == true)
-			break;
-	}
-
-	if (!SD_write_error)
-		SD_write_error = !SD_end_write_from_ringBuff();
-	SD_unsetup();
-
-	parser_use_sd_flag = false;
-	parser_task_flag = false;
-	vTaskDelete(NULL);
 }
 
 uint8_t invert_bit(const uint8_t byte, const uint8_t bit)
