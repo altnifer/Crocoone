@@ -73,11 +73,12 @@ void refresh_title() {
 		ST7735_WriteString(1, 1, title, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		refresh_title_text = false;
 	}
-	uint16_t offset = 2 + strlen(title) * 7;
-	fillRect(offset, 0, ST7735_WIDTH - offset, TITLE_END_Y, MAIN_BG_COLOR);
 	sprintf(battery_persent_disp, "%3d%%", batteryPercent);
 	ST7735_WriteString(99, 1, battery_persent_disp, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-	if (SD_flag)  ST7735_WriteString(87, 1, "SD", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+	if (SD_flag)
+		ST7735_WriteString(87, 1, "SD", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+	else
+		ST7735_WriteString(87, 1, "  ", Font_5x7, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 }
 
 void update_title_text(char * new_title) {

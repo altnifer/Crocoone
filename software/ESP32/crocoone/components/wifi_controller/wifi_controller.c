@@ -2,6 +2,8 @@
 #include "esp_wifi.h"
 #include <string.h>
 
+static uint8_t original_mac_ap[6];
+
 void wifi_init() {
 	ESP_ERROR_CHECK(esp_netif_init());
 	
@@ -13,7 +15,13 @@ void wifi_init() {
 
 	ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
 	ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
+
+    // save original AP MAC address
+    ESP_ERROR_CHECK(esp_wifi_get_mac(WIFI_IF_AP, original_mac_ap));
+
 	ESP_ERROR_CHECK(esp_wifi_start());
+
+    wifi_default_ap_start();
 }
 
 void wifi_sta_connect_to_ap(const wifi_ap_record_t *ap_record, const char password[]) {
@@ -38,11 +46,29 @@ void wifi_sta_connect_to_ap(const wifi_ap_record_t *ap_record, const char passwo
     ESP_ERROR_CHECK(esp_wifi_connect());
 }
 
+void wifi_ap_start(wifi_config_t *wifi_config) {
+    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, wifi_config));
+}
+
+void wifi_default_ap_start() {
+    wifi_config_t wifi_config = {
+        .ap = {
+            .ssid = DEFAULT_AP_SSID,
+            .ssid_len = strlen(DEFAULT_AP_SSID),
+            .password = DEFAULT_AP_PASSWORD,
+            .max_connection = DEFAULT_AP_MAX_CONNECTIONS,
+            .authmode = WIFI_AUTH_WPA2_PSK
+        },
+    };
+    wifi_ap_start(&wifi_config);
+    ESP_ERROR_CHECK(esp_wifi_set_mac(WIFI_IF_AP, original_mac_ap));
+}
+
 void wifi_sta_disconnect() {
     ESP_ERROR_CHECK(esp_wifi_disconnect());
 }
 
-esp_err_t wifi_set_channel(uint8_t channel) {
+esp_err_t wifi_set_channel(const uint8_t channel) {
     if((channel < MINWIFICH) || (channel >  MAXWIFICH)){
         return ESP_ERR_INVALID_ARG;
     }
@@ -51,4 +77,8 @@ esp_err_t wifi_set_channel(uint8_t channel) {
 
 void wifi_get_sta_mac(uint8_t *mac_sta) {
     esp_wifi_get_mac(WIFI_IF_STA, mac_sta);
+}
+
+void wifi_set_ap_mac(uint8_t *mac_ap) {
+    ESP_ERROR_CHECK(esp_wifi_set_mac(WIFI_IF_AP, mac_ap));
 }

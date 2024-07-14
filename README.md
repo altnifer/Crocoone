@@ -113,7 +113,7 @@ If you have ESP-IDF setup, just use **idf.py flash**.
 Otherwise use [`esptool.py`](https://github.com/espressif/esptool). Use this command:
 
 ```
-esptool.py -p COM7 -b 115200 --after hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size detect 0x8000 build/partition_table/partition-table.bin 0x1000 build/bootloader/bootloader.bin 0x10000 build/crocoone.bin
+esptool.py -p COM7 -b 460800 --after hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size detect 0x8000 build/partition_table/partition-table.bin 0x1000 build/bootloader/bootloader.bin 0x10000 build/crocoone.bin
 ```
 
 After completing the firmware, remove the jumper.

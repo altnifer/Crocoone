@@ -4,11 +4,9 @@
 #include "wifi_controller.h"
 
 typedef enum {
-    METHOD_NONE = 0,
     METHOD_PASSIVE,
     METHOD_DEAUTH,
-    METHOD_EVIL_AP,
-    METHOD_COMBINED
+    METHOD_EVIL_AP
 } handshake_method_t;
 
 void handshake_attack_start(wifi_ap_record_t * target, handshake_method_t method, bool send_pcap_flag);

@@ -232,7 +232,7 @@ bool deauth_cmd_check(cmd_data_t cmd_data) {
         send_error_responce(cmd_data, "wrong target (param 0)");
         return false;        
     }
-    if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
+    if (timeout < EMPTY_PARAM || timeout > 255) {
         send_error_responce(cmd_data, "wrong timeout (param 1)");
         return false;        
     }    
@@ -261,11 +261,11 @@ bool handshake_cmd_check(cmd_data_t cmd_data) {
         send_error_responce(cmd_data, "wrong target (param 0)");
         return false;        
     }
-    if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
+    if (timeout < EMPTY_PARAM || timeout > 255) {
         send_error_responce(cmd_data, "wrong timeout (param 3)");
         return false;        
     }    
-    if (method != (int)METHOD_PASSIVE && method != (int)METHOD_DEAUTH) {
+    if (method < METHOD_PASSIVE || method > METHOD_EVIL_AP) {
         send_error_responce(cmd_data, "wrong method (param 1)");
         return false;        
     }    
@@ -285,7 +285,7 @@ bool handshake_cmd_check(cmd_data_t cmd_data) {
 bool beacon_cmd_check(cmd_data_t cmd_data) {
     int timeout = cmd_data.param[0];
 
-    if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
+    if (timeout < EMPTY_PARAM || timeout > 255) {
         send_error_responce(cmd_data, "wrong channel (param 0)");
         return false;        
     }    
@@ -301,7 +301,7 @@ bool beacon_cmd_check(cmd_data_t cmd_data) {
 bool pmkid_cmd_check(cmd_data_t cmd_data) {
     int timeout = cmd_data.param[0];
 
-    if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
+    if (timeout < EMPTY_PARAM || timeout > 255) {
         send_error_responce(cmd_data, "wrong timeout (param 0)");
         return false;        
     }    
@@ -330,7 +330,7 @@ bool packet_monitor_cmd_check(cmd_data_t cmd_data) {
         send_error_responce(cmd_data, "wrong filter (param 1)");
         return false;        
     }    
-    if ((timeout > MAX_TIMEOUT_SEC || timeout < MIN_TIMEOUT_SEC) && timeout != EMPTY_PARAM) {
+    if (timeout < EMPTY_PARAM || timeout > 255) {
         send_error_responce(cmd_data, "wrong timeout (param 3)"); 
         return false;        
     }    

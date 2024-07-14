@@ -45,11 +45,16 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-static int curr_set = 0;
-static const int set_count = 8;
-static bool clear = 1;
-static bool screen_update = 1;
-static eButtonEvent button_up, button_down, button_confirm;
+static const char *MAIN_MENU_SETS[] = {
+	"Wi-Fi scan",
+	"Ch Analyzer",
+	"Pkt Analyzer",
+	"PMKID attack",
+	"deauth",
+	"beacon",
+	"handshake"
+};
+#define MAX_MAIN_MENU_SET_COUNT (sizeof(MAIN_MENU_SETS) / sizeof(char *))
 
 SemaphoreHandle_t SPI2_mutex;
 /* USER CODE END PTD */
@@ -787,7 +792,36 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void draw_main_menu(int curr_set, bool button, bool full_refresh) {
+	static const uint16_t YStart = TITLE_END_Y + 9;
+	static uint8_t prev_curr_set = 0;
+	static bool prev_button = false;
 
+	if (full_refresh) {
+		refresh_title();
+		fillScreenExceptTitle();
+	}
+
+	if (full_refresh || prev_curr_set != curr_set || prev_button != button) {
+		drawMenu(
+				(char **)MAIN_MENU_SETS,
+				MAX_MAIN_MENU_SET_COUNT,
+				12, YStart + 20, 116, YStart + 108,
+				button ? -1 : curr_set,
+				Font_7x10,
+				MAIN_TXT_COLOR, MAIN_BG_COLOR
+		);
+
+	}
+
+	if (full_refresh || prev_button != button) {
+		drawIcon("functions", !button, 4, YStart, 125, YStart + 110, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+		darwMiddleButton("power off", YStart + 120, Font_7x10, button, MAIN_TXT_COLOR, MAIN_BG_COLOR);
+	}
+
+	prev_curr_set = curr_set;
+	prev_button = button;
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -800,37 +834,37 @@ static void MX_GPIO_Init(void)
 void StartDefaultTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-
+  static int curr_set = 0;
+  static bool screen_update = true;
+  static eButtonEvent button_up, button_down, button_confirm;
+  static bool button = false;
   /* Infinite loop */
   while (1) {
+	xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
+	if (screen_update) update_title_text("main menu");
+	draw_main_menu(curr_set, button, screen_update);
+	screen_update = false;
+	xSemaphoreGive(SPI2_mutex);
+
+
 	button_up = GetButtonState(BUTTON_UP);
 	button_down = GetButtonState(BUTTON_DOWN);
 	button_confirm = GetButtonState(BUTTON_CONFIRM);
 
 	if (button_down == SINGLE_CLICK || button_down == HOLD) {
-		curr_set = (curr_set + 1) % set_count;
-		screen_update = 1;
+		curr_set = (curr_set + 1) % MAX_MAIN_MENU_SET_COUNT;
 	}
 	if (button_up == SINGLE_CLICK || button_up == HOLD) {
-		curr_set = (curr_set - 1) % set_count;
-		if (curr_set < 0) curr_set = set_count;
-		screen_update = 1;
+		curr_set = (curr_set - 1) % MAX_MAIN_MENU_SET_COUNT;
+		if (curr_set < 0) curr_set = MAX_MAIN_MENU_SET_COUNT;
 	}
-
-	xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
-	if (clear) {
-		update_title_text("main menu");
-		refresh_title();
-		fillScreenExceptTitle();
-		clear = 0;
+	if (button_down == DOUBLE_CLICK || button_up == DOUBLE_CLICK)
+		button = !button;
+	if (button_confirm == SINGLE_CLICK && button) {
+		HAL_GPIO_WritePin(LCD_LIGHT_GPIO_Port, LCD_LIGHT_Pin, GPIO_PIN_RESET);
+	  	HAL_GPIO_WritePin(POWER_ON_GPIO_Port, POWER_ON_Pin, GPIO_PIN_RESET); //power off
+		break;
 	}
-
-	if (screen_update) {
-		drawMenu((char * []) {"Wi-Fi scan","Ch Analyzer", "Pkt Analyzer", "PMKID attack", "deauth", "beacon", "handshake", "power off"}, set_count, 5, 30, 123, 159, curr_set, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
-		screen_update = 0;
-	}
-	xSemaphoreGive(SPI2_mutex);
-
 	if (button_confirm == SINGLE_CLICK) {
 		if (curr_set == 0)
 			ESP32_scan_wifi((TaskHandle_t *)&defaultTaskHandle);
@@ -844,18 +878,13 @@ void StartDefaultTask(void *argument)
 			ESP32_start_deauth_attack((TaskHandle_t *)&defaultTaskHandle);
 		else if (curr_set == 5)
 			ESP32_start_beacon_attack((TaskHandle_t *)&defaultTaskHandle);
-		else if (curr_set == 6)
+		else
 			ESP32_start_handshake_attack((TaskHandle_t *)&defaultTaskHandle);
-		else {
-			HAL_GPIO_WritePin(LCD_LIGHT_GPIO_Port, LCD_LIGHT_Pin, GPIO_PIN_RESET);
-		  	HAL_GPIO_WritePin(POWER_ON_GPIO_Port, POWER_ON_Pin, GPIO_PIN_RESET); //power off
-			break;
-		}
+
 		vTaskSuspend(NULL);
 
 		ClearAllButtons();
-		screen_update = 1;
-		clear = 1;
+		screen_update = true;
 	}
     osDelay(250);
   }

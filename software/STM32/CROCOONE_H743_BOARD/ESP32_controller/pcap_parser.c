@@ -78,13 +78,17 @@ void pcap_parser_task(void *args) {
 		}
 		UART_ringBuffer_mutex_give();
 
-		if ((SD_write_error = !SD_write_from_ringBuff()) == true)
-			break;
+		if (parser_use_sd_flag) {
+			if ((SD_write_error = !SD_write_from_ringBuff()) == true)
+				break;
+		}
 	}
 
-	if (!SD_write_error)
-		SD_write_error = !SD_end_write_from_ringBuff();
-	SD_unsetup();
+	if (parser_use_sd_flag) {
+		if (!SD_write_error)
+			SD_write_error = !SD_end_write_from_ringBuff();
+		SD_unsetup();
+	}
 
 	parser_use_sd_flag = false;
 	parser_task_flag = false;

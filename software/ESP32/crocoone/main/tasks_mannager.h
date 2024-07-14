@@ -1,11 +1,6 @@
 #ifndef TASKS_MANNAGER_H
 #define TASKS_MANNAGER_H
 
-#define MAX_TIMEOUT_SEC 300
-#define MIN_TIMEOUT_SEC 10
-
-#define MAX_PKT_SIZE 2048
-
 #define CMD_START "AT+"
 #define CMD_PARAM_START '='
 #define EMPTY_PARAM 0

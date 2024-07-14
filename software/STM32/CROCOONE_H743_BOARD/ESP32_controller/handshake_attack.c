@@ -120,11 +120,12 @@ bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, cha
 		pcap_parser_set_use_sd_flag(true);
 	}
 
-	if (!send_cmd_with_check((cmd_data_t){HANDSHAKE_CMD, {get_target(),method,save_pcap,timeout,0}}, error_buff, 2000))
+	if (!send_cmd_with_check((cmd_data_t){HANDSHAKE_CMD, {get_target(),method,true,timeout,0}}, error_buff, 2000)) {
+		if (save_pcap) SD_unsetup();
 		return false;
+	}
 
-	if (save_pcap)
-		pcap_parser_start();
+	pcap_parser_start();
 
 	return true;
 }
@@ -213,12 +214,13 @@ attack_state_t handshake_prepare_page(char* error_buff) {
 	bool button = false;
 	static uint8_t set = 0;
 	eButtonEvent button_up, button_down, button_left, button_right, button_confirm;
+	eapol_sum = 0;
 
 	ClearAllButtons();
 
 	while (1) {
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);
-		darw_settings_page(set, timeout, method + 1, save_pcap, button, full_update_screen);
+		darw_settings_page(set, timeout, method, save_pcap, button, full_update_screen);
 		full_update_screen = false;
 		xSemaphoreGive(SPI2_mutex);
 
@@ -239,16 +241,16 @@ attack_state_t handshake_prepare_page(char* error_buff) {
 		if ((button_left == SINGLE_CLICK || button_left == HOLD) && set == 0)
 			timeout--;
 		if (button_right == SINGLE_CLICK && set == 1)
-			method = (method + 1) % 4;
+			method = (method + 1) % 3;
 		if (button_left == SINGLE_CLICK && set == 1)
-			method = ((uint8_t)(method - 1) > 3) ? (3) : (method - 1);
+			method = ((uint8_t)(method - 1) > 2) ? (2) : (method - 1);
 		if ((button_right == SINGLE_CLICK || button_left == SINGLE_CLICK) && set == 2)
 			save_pcap = !save_pcap;
 
 		if (button_right == DOUBLE_CLICK)
 			return EXIT;
 		if (button_confirm == SINGLE_CLICK && button) {
-			if (!handshake_attack_start(timeout, method + 1, save_pcap, error_buff))
+			if (!handshake_attack_start(timeout, method, save_pcap, error_buff))
 				return ERROR_HANDLER;
 			else
 				return RUNING;
@@ -461,15 +463,12 @@ static void darw_settings_page(uint8_t set, uint8_t timeout, uint8_t method, boo
 				Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR
 		);
 
-		if (method == 1)
+		if (method == 0)
 			memcpy(temp_buff, "PASSIVE", strlen("PASSIVE") + 1);
-		else if (method == 2)
+		else if (method == 1)
 			memcpy(temp_buff, "DEAUTH", strlen("DEAUTH") + 1);
-		else if (method == 3)
+		else
 			memcpy(temp_buff, "EVIL AP", strlen("EVIL AP") + 1);
-		else if (method == 4)
-			memcpy(temp_buff, "COMBINED", strlen("COMBINED") + 1);
-
 
 		uint8_t method_len = strlen(temp_buff);
 		if (prev_method_len != method_len)
