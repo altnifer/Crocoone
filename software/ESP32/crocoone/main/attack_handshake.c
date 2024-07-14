@@ -76,15 +76,15 @@ void handshake_method_evil_ap(const wifi_ap_record_t *ap_record) {
 
 void handshake_get_hccapx_data() {
     uint16_t hccapx_size = sizeof(hccapx_t);
-    uint16_t packet_header_size = strlen("HCCAPX data (0000 bytes): ");
-    char hccapx_data[hccapx_size + packet_header_size + 2];
+    uint16_t packet_header_size = strlen("HCCAPX data: ");
+    char hccapx_data[packet_header_size + hccapx_size + 2]; //hccapx_size + packet_header_size + '\n' + '\0'
     hccapx_t * hccapx = hccapx_serializer_get();
-    sprintf(hccapx_data, "HCCAPX data (%4hu bytes): ", hccapx_size);
+    memcpy(hccapx_data, "HCCAPX data: ", packet_header_size);
     if (hccapx == NULL) {
         hccapx_size = strlen("NONE");
         memcpy(hccapx_data + packet_header_size, "NONE", hccapx_size);
     } else {
-        memcpy(hccapx_data + packet_header_size, hccapx, packet_header_size);
+        memcpy(hccapx_data + packet_header_size, hccapx, hccapx_size);
     }
     memcpy(hccapx_data + packet_header_size + hccapx_size, "\n", 2);
     UART_write(hccapx_data, packet_header_size + hccapx_size + 1);
@@ -92,8 +92,7 @@ void handshake_get_hccapx_data() {
 
 void handshake_get_hc22000_data() {
     uint16_t packet_header_size = strlen("HC22000 data: ");
-    //packet_header_size + MAX_HC22000_02_LEN + '\n' + '\0'
-    char hc22000_data[packet_header_size + MAX_HC22000_02_LEN + 2];
+    char hc22000_data[packet_header_size + MAX_HC22000_02_LEN + 2]; //packet_header_size + MAX_HC22000_02_LEN + '\n' + '\0'
     memcpy(hc22000_data, "HC22000 data: ", packet_header_size);
     hccapx_t * hccapx = hccapx_serializer_get();
     uint16_t hc22000_size = 0;

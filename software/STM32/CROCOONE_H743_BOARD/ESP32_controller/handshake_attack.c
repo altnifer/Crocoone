@@ -18,8 +18,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define HC22000_DATA_PKT_HEADER "HC22000 data: "
-
 typedef enum {
 	SAVE_ERROR,
 	SAVE_OK,
@@ -35,6 +33,11 @@ typedef enum {
 	EXIT
 } attack_state_t;
 
+typedef enum {
+	HCCAPX,
+	HC22000
+} handshake_data_t;
+
 extern SemaphoreHandle_t SPI2_mutex;
 
 static bool save_pcap = false;
@@ -45,7 +48,7 @@ uint32_t eapol_sum = 0;
 void handshake_attack_main_task(void *main_task_handle);
 bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, char *error_buff);
 bool handshake_attack_stop(char *error_buff);
-data_save_res_t handshake_attack_get_hc22000(char *error_buff);
+data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_buff);
 attack_state_t handshake_prepare_page(char* error_buff);
 attack_state_t handshake_not_ready_page(char* error_buff);
 attack_state_t handshake_running_page(char* error_buff);
@@ -137,30 +140,40 @@ bool handshake_attack_stop(char *error_buff) {
 	return true;
 }
 
-data_save_res_t handshake_attack_get_hc22000(char *error_buff) {
-	data_save_res_t ret_val = SAVE_ERROR;
+data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_buff) {
+	const uint16_t SIZEOF_HCCAPX = 394; //see hccapx_serializer component of ESP32 code
 	const uint16_t RECEIVE_TIMEOUT_MS = 500;
+	data_save_res_t ret_val = SAVE_ERROR;
 	FRESULT sd_setup_error_code;
 	uint32_t file_num;
-	char file_name[strlen(HANDSHAKE_HC22000_FILE_NAME) + 18];
+	char file_name[strlen(HANDSHAKE_FILE_NAME) + 18];
+	uint16_t file_num_eeprom_addr = (data_t == HC22000) ? EEPROM_HANDSHAKE_HC22000_ADDR : EEPROM_HANDSHAKE_HCCAPX_ADDR;
+	cmd_data_t get_data_cmd = {};
+	memcpy(
+			get_data_cmd.cmdName,
+			(data_t == HC22000) ? HC22000_CMD : HCCAPX_CMD,
+			(data_t == HC22000) ? strlen(HC22000_CMD) : strlen(HCCAPX_CMD)
+		  );
+	char *file_format = (data_t == HC22000) ? (".hc22000") : (".hccapx");
 
-	eeprom_read_set(EEPROM_HANDSHAKE_HC22000_ADDR, &file_num);
-	sprintf(file_name, "%s_%lu.hc22000", HANDSHAKE_HC22000_FILE_NAME, file_num);
-	sd_setup_error_code = SD_setup(file_name, HANDSHAKE_FOLDER_NAME, 10);
+	eeprom_read_set(file_num_eeprom_addr, &file_num);
+	sprintf(file_name, "%s_%lu%s", HANDSHAKE_FILE_NAME, file_num, file_format);
+	sd_setup_error_code = SD_setup(file_name, HANDSHAKE_FOLDER_NAME, 9);
 	if (sd_setup_error_code != FR_OK) {
 		sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 		return ret_val;
 	}
 	file_num++;
-	eeprom_write_set(EEPROM_HANDSHAKE_HC22000_ADDR, &file_num);
+	eeprom_write_set(file_num_eeprom_addr, &file_num);
 
-	if (!send_cmd_with_check((cmd_data_t){HC22000_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
+	if (!send_cmd_with_check(get_data_cmd, error_buff, 2000)) {
 		SD_unsetup();
 		return ret_val;
 	}
 
-	uint16_t pkt_header_len = strlen(HC22000_DATA_PKT_HEADER);
-	uint16_t hc22000_data_len;
+	char *pkt_header = ((data_t == HC22000) ? ("HC22000 data: ") : ("HCCAPX data: "));
+	uint16_t pkt_header_len = strlen(pkt_header);
+	uint16_t handshake_data_len;
 	int32_t msg_start;
 	uint32_t curr_time = HAL_GetTick();
 	ring_buffer_t *uart_ring_buffer = get_ring_buff();
@@ -168,17 +181,21 @@ data_save_res_t handshake_attack_get_hc22000(char *error_buff) {
 		if (!get_recieved_pkts_count()) continue;
 
 		UART_ringBuffer_mutex_take();
-		if ((msg_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)HC22000_DATA_PKT_HEADER, pkt_header_len)) == -1) {
+		if ((msg_start = ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)pkt_header, pkt_header_len)) == -1) {
 			UART_ringBuffer_mutex_give();
 			continue;
 		}
 		ringBuffer_clearNBytes(uart_ring_buffer, (uint16_t)msg_start + pkt_header_len);
 
-		hc22000_data_len = (uint16_t)ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"\n", 1);
-		if (hc22000_data_len == -1 || hc22000_data_len == strlen("NONE")) {
+		if (ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"NONE\n", 5) != -1) {
 			ret_val = NO_DATA;
 		} else {
-			copy_ringBuff_to_SD_buff(uart_ring_buffer, (uint16_t)hc22000_data_len);
+			if (data_t == HC22000)
+				handshake_data_len = (uint16_t)ringBuffer_findSequence(uart_ring_buffer, (uint8_t *)"\n", 1);
+			else if (data_t == HCCAPX)
+				handshake_data_len = SIZEOF_HCCAPX;
+
+			copy_ringBuff_to_SD_buff(uart_ring_buffer, handshake_data_len);
 			if (!SD_end_write_from_ringBuff()) {
 				memcpy(error_buff, "SD write error", strlen("SD write error") + 1);
 				ret_val = SAVE_ERROR;
@@ -323,7 +340,8 @@ attack_state_t handshake_saving_data_page(char* error_buff) {
 	xSemaphoreGive(SPI2_mutex);
 
 	osDelay(100 / portTICK_PERIOD_MS); //wait while pcap parser task ended
-	save_res = handshake_attack_get_hc22000(error_buff);
+	save_res = handshake_attack_get_data(HC22000, error_buff);
+	save_res = handshake_attack_get_data(HCCAPX, error_buff);
 	if (save_res == SAVE_ERROR) return ERROR_HANDLER;
 
 	update_title_SD_flag(false);

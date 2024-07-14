@@ -852,11 +852,11 @@ void StartDefaultTask(void *argument)
 	button_confirm = GetButtonState(BUTTON_CONFIRM);
 
 	if (button_down == SINGLE_CLICK || button_down == HOLD) {
-		curr_set = (curr_set + 1) % MAX_MAIN_MENU_SET_COUNT;
+		curr_set = (curr_set + 1) % (int)MAX_MAIN_MENU_SET_COUNT;
 	}
 	if (button_up == SINGLE_CLICK || button_up == HOLD) {
-		curr_set = (curr_set - 1) % MAX_MAIN_MENU_SET_COUNT;
-		if (curr_set < 0) curr_set = MAX_MAIN_MENU_SET_COUNT;
+		curr_set = (curr_set - 1) % (int)MAX_MAIN_MENU_SET_COUNT;
+		if (curr_set < 0) curr_set = (int)MAX_MAIN_MENU_SET_COUNT - 1;
 	}
 	if (button_down == DOUBLE_CLICK || button_up == DOUBLE_CLICK)
 		button = !button;

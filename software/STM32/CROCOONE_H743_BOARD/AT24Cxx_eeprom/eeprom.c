@@ -34,6 +34,9 @@ bool eeprom_init(void) {
 
 		if (!at24_write(EEPROM_HANDSHAKE_HC22000_ADDR, (uint8_t *)&buff, 4))
 			return false;
+
+		if (!at24_write(EEPROM_HANDSHAKE_HCCAPX_ADDR, (uint8_t *)&buff, 4))
+			return false;
 	}
 
 	return true;

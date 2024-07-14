@@ -10,7 +10,7 @@
 
 #define HANDSHAKE_FOLDER_NAME "handshake"
 #define HANDSHAKE_PCAP_FILE_NAME "packets"
-#define HANDSHAKE_HC22000_FILE_NAME "handshake"
+#define HANDSHAKE_FILE_NAME "handshake"
 
 #include "cmsis_os.h"
 #include "semphr.h"
