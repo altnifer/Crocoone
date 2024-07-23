@@ -9,15 +9,31 @@
 #define INC_SD_CARD_H_
 
 #include "fatfs.h"
-#include "ring_buffer.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include "adt.h"
 
 #define WRITE_TIMEOUT_MS 250
 
-FRESULT SD_setup(char * file_name, char * dir_name, uint8_t pkt_size);
+FRESULT SD_mount_card();
 
-void SD_unsetup();
+FRESULT SD_unmount_card();
+
+FRESULT SD_mkpath(const char *path);
+
+FRESULT SD_scan_files(char *path, char *extension_filter, list_t **out_list);
+
+FRESULT SD_open_file_to_read(char *path);
+
+char *SD_f_gets(char *buff, int buff_len);
+
+int SD_f_eof();
+
+FRESULT SD_close_current_file();
+
+FRESULT SD_setup_write_from_ringBuff(char *path, char *file, uint8_t pkt_size);
+
+void SD_unsetup_write_from_ringBuff();
 
 bool SD_write_from_ringBuff();
 

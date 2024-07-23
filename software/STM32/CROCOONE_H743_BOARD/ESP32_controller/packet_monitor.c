@@ -208,7 +208,7 @@ bool packet_monitor_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool u
 	if (use_sd) {
 		eeprom_read_set(EEPROM_MONITOR_PCAP_ADDR, &file_num);
 		sprintf(file_name, "%s_%lu.pcap", MONITOR_FILE_NAME, file_num);
-		sd_setup_error_code = SD_setup(file_name, MONITOR_FOLDER_NAME, 12);
+		sd_setup_error_code = SD_setup_write_from_ringBuff(MONITOR_FOLDER_NAME, file_name, 12);
 		if (sd_setup_error_code != FR_OK) {
 			sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 			return false;
@@ -223,7 +223,7 @@ bool packet_monitor_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool u
 		target = get_target();
 
 	if (!send_cmd_with_check((cmd_data_t){MONITOR_CMD, {ch, filter_mask, target, 0, 0}}, error_buff, 2000)) {
-		SD_unsetup();
+		SD_unsetup_write_from_ringBuff();
 		return false;
 	}
 

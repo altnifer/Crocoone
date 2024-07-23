@@ -375,7 +375,43 @@ void drawMenu(char ** param, uint16_t str_count, uint16_t x0, uint16_t y0, uint1
 			fillRect(x0, i * (font.height + 2) + y0 - currentPage * max_set_in_page * (font.height + 2), x1 - x0, font.height, bg_color);
 		}
 	}
+}
 
+void drawStringsList(list_t **str_list, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1,
+	int set, FontDef font, uint16_t txt_color, uint16_t bg_color) {
+
+	uint16_t str_count = list_get_len(str_list);
+	set = (set < 0) ? -1 : set % str_count;
+	uint8_t max_set_in_page = (y1 - y0) / (font.height + 2);
+	uint8_t max_ch_in_str = (x1 - x0) / font.width;
+	uint8_t currentPage = (set == -1) ? (0) : (set / max_set_in_page);
+	uint8_t max_set;
+
+	if (currentPage == str_count / max_set_in_page) {
+		max_set = currentPage * max_set_in_page + str_count % max_set_in_page;
+	} else {
+		max_set = (currentPage * max_set_in_page + max_set_in_page);
+	}
+
+	item_t *item;
+	for (uint16_t i = currentPage * max_set_in_page; i < (currentPage + 1) * max_set_in_page; i++) {
+		item = list_get_next(str_list, i);
+		if (i < max_set) {
+			char word[max_ch_in_str + 1];
+			memset(word, 0, (max_ch_in_str + 1)*sizeof(char));
+			ST7735_WriteString(
+					x0,
+					i * (font.height + 2) + y0 - currentPage * max_set_in_page * (font.height + 2),
+					strncpy(word, (char *)item->data, max_ch_in_str),
+					font,
+					(i == set) ? bg_color : txt_color,
+					(i == set) ? txt_color : bg_color
+			);
+			fillRect(x0 + strlen(word) * font.width, i * (font.height + 2) + y0 - currentPage * max_set_in_page * (font.height + 2), x1 - x0 - strlen(word) * font.width, font.height, bg_color);
+		} else {
+			fillRect(x0, i * (font.height + 2) + y0 - currentPage * max_set_in_page * (font.height + 2), x1 - x0, font.height, bg_color);
+		}
+	}
 }
 
 void drawIcon(const char* header_t, bool highlight,

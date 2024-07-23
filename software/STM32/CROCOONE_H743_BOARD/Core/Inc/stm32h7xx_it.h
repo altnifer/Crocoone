@@ -59,6 +59,7 @@ void SPI2_IRQHandler(void);
 void EXTI15_10_IRQHandler(void);
 void UART7_IRQHandler(void);
 void UART8_IRQHandler(void);
+void OTG_FS_IRQHandler(void);
 void TIM17_IRQHandler(void);
 void SDMMC2_IRQHandler(void);
 /* USER CODE BEGIN EFP */

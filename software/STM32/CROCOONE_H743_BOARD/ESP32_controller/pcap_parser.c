@@ -87,7 +87,7 @@ void pcap_parser_task(void *args) {
 	if (parser_use_sd_flag) {
 		if (!SD_write_error)
 			SD_write_error = !SD_end_write_from_ringBuff();
-		SD_unsetup();
+		SD_unsetup_write_from_ringBuff();
 	}
 
 	parser_use_sd_flag = false;

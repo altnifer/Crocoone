@@ -5,10 +5,10 @@
  *      Author: nikit
  */
 #include "SD_card.h"
-#include "ring_buffer.h"
 #include "cmsis_os.h"
 #include "semphr.h"
-#include "string.h"
+#include <string.h>
+#include <stdio.h>
 
 #define SD_MIN_PKT_SIZE 5
 #define SD_MAX_PKT_SIZE 12
@@ -21,8 +21,8 @@ static uint16_t curr_sync_sum;
 static uint16_t curr_pkt_size;
 static ring_buffer_t SD_ring_buffer = {};
 
-FRESULT SD_mount_card();
-FRESULT SD_unmount_card();
+int32_t contains_symbol(char *symbols, uint16_t symbols_len, char symbol);
+int32_t contains_symbol_reversed(char *symbols, uint16_t symbols_len, char symbol);
 
 FRESULT SD_mount_card() {
 	FRESULT status;
@@ -46,34 +46,123 @@ FRESULT SD_unmount_card() {
 	return res;
 }
 
-FRESULT SD_setup(char * file_name, char * dir_name, uint8_t pkt_size) {
-	if (pkt_size > SD_MAX_PKT_SIZE || pkt_size < SD_MIN_PKT_SIZE || file_name == NULL)
+FRESULT SD_mkpath(const char *path) {
+	FRESULT res;
+	uint16_t path_size = strlen(path) + 1;
+	char path_copy[path_size];
+	memcpy(path_copy, path, path_size);
+
+	char *path_p = path_copy;
+	int32_t token_len;
+	path_size--;
+
+	while ((token_len = contains_symbol(path_p, path_size, '/')) != -1) {
+		path_p[token_len] = '\0';
+		res = f_mkdir(path_copy);
+		if (res != FR_OK && res != FR_EXIST)
+			return res;
+		path_p[token_len] = '/';
+
+		path_p += (token_len + 1);
+		path_size -= (token_len + 1);
+    }
+
+	if (path_size)
+		res = f_mkdir(path_copy);
+
+	return res;
+}
+
+FRESULT scan_files_recursion(char *path, char *extension_filter, list_t **out_list) {
+	FRESULT res;
+	FILINFO fno;
+	DIR dir;
+	int path_len;
+	char *fn;
+
+	res = f_opendir(&dir, path);
+
+	if (res != FR_OK)
+		return res;
+
+	path_len = strlen(path);
+	while(1) {
+		res = f_readdir(&dir, &fno);
+		if (res != FR_OK || fno.fname[0] == '\0')
+		   break;
+		if (fno.fname[0] == '.')
+		   continue;
+		fn = fno.fname;
+		if (fno.fattrib & AM_DIR) {
+			sprintf(path + path_len, "/%s", fn);
+			res = scan_files_recursion(path, extension_filter, out_list);
+			if (res != FR_OK) break;
+			path[path_len] = '\0';
+		} else {
+			if (extension_filter != NULL) {
+				uint16_t ext_start = contains_symbol_reversed(fn, strlen(fn), '.');
+				if (strcmp(fn + ext_start, extension_filter))
+					continue;
+			}
+			sprintf(path + path_len, "/%s", fn);
+			list_push_back(out_list, path, strlen(path) + 1);
+			path[path_len] = '\0';
+		}
+	}
+	return res;
+}
+
+FRESULT SD_scan_files(char *path, char *extension_filter, list_t **out_list) {
+	char path_workspace[1024];
+	memcpy(path_workspace, path, strlen(path) + 1);
+	FRESULT res = scan_files_recursion(path_workspace, extension_filter, out_list);
+
+	if (res == FR_NO_PATH)
+		SD_mkpath(path);
+
+	return res;
+}
+
+FRESULT SD_open_file_to_read(char *path) {
+	f_open(&MyFile, path, FA_READ);
+}
+
+char *SD_f_gets(char *buff, int buff_len) {
+	return f_gets(buff, buff_len, &MyFile);
+}
+
+int SD_f_eof() {
+	return f_eof(&MyFile);
+}
+
+FRESULT SD_close_current_file() {
+	return f_close(&MyFile);
+}
+
+FRESULT SD_setup_write_from_ringBuff(char *path, char *file, uint8_t pkt_size) {
+	if (pkt_size > SD_MAX_PKT_SIZE || pkt_size < SD_MIN_PKT_SIZE || file == NULL)
 		return FR_INVALID_PARAMETER;
 
 	FRESULT res;
-	char file_path[256]; //255 - max LFN file name length
-	uint16_t dir_name_len = 0;
-	uint16_t file_name_len = 0;
+	uint16_t path_len = (path == NULL) ? 0 : strlen(path);
+	uint16_t file_len = strlen(file);
+	char file_path[path_len + file_len + 2];
 
 	res = SD_mount_card();
 	if (res != FR_OK) return res;
 
-	if (dir_name != NULL) {
-		res = f_mkdir(dir_name);
+	if (path != NULL) {
+		res = SD_mkpath(path);
 		if (res != FR_OK && res != FR_EXIST) {
 			SD_unmount_card();
 			return res;
 		}
-
-		dir_name_len = strlen(dir_name);
-		memcpy(file_path, dir_name, dir_name_len);
-		file_path[dir_name_len] = '/';
-		dir_name_len++;
 	}
 
-	file_name_len = strlen(file_name);
-	memcpy(file_path + dir_name_len, file_name, file_name_len);
-	file_path[file_name_len + dir_name_len] = '\0';
+	memcpy(file_path, path, path_len);
+	file_path[path_len] = '/';
+	memcpy(file_path + path_len + 1, file, file_len);
+	file_path[file_len + path_len + 1] = '\0';
 	res = f_open(&MyFile, file_path, FA_CREATE_NEW | FA_WRITE);
 	if (res != FR_OK) {
 		SD_unmount_card();
@@ -89,7 +178,7 @@ FRESULT SD_setup(char * file_name, char * dir_name, uint8_t pkt_size) {
 	return FR_OK;
 }
 
-void SD_unsetup() {
+void SD_unsetup_write_from_ringBuff() {
 	if (SD_setup_flag) {
 		f_close(&MyFile);
 		SD_unmount_card();
@@ -161,3 +250,7 @@ bool copy_ringBuff_to_SD_buff(ring_buffer_t *buffer_source, uint16_t bytes_to_co
 
     return true;
 }
+
+
+
+

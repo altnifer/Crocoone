@@ -24,8 +24,8 @@ static bool timer_is_active = false;
 void task_timer_callback(void *arg);
 void task_mannager(void *args);
 bool parse_first_cmd(char *buffer, unsigned int buffer_len, cmd_data_t *output);
-unsigned int contains_symbol(char *symbols, unsigned int symbols_len, char symbol);
-unsigned int get_first_token(char *str, unsigned int str_len, char *separators, unsigned int sep_count);
+int32_t contains_symbol(char *symbols, uint16_t symbols_len, char symbol);
+uint16_t get_first_token(char *str, uint16_t str_len, char *separators, uint16_t sep_count);
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff);
 void send_error_responce(cmd_data_t cmd_data, char *eeror_msg);
 void send_responce(cmd_data_t cmd_data);
@@ -86,7 +86,7 @@ bool parse_first_cmd(char *buffer, unsigned int buffer_len, cmd_data_t *output) 
     if (buffer_len == 0) return false; //empty cmd ("AT+")
 
     int cmdNameLen = buffer_len;
-    char *paramStart = buffer + contains_symbol(buffer, buffer_len, CMD_PARAM_START);
+    char *paramStart = buffer + contains_symbol(buffer, buffer_len, CMD_PARAM_START) + 1;
 
     if (paramStart > buffer) {
         int paramLen = buffer_len - (paramStart - buffer);
@@ -109,29 +109,24 @@ bool parse_first_cmd(char *buffer, unsigned int buffer_len, cmd_data_t *output) 
     return true;
 }
 
-unsigned int contains_symbol(char *symbols, unsigned int symbols_len, char symbol) {
-  unsigned int pos = 1;
-  char *start_p = symbols;
+int32_t contains_symbol(char *symbols, uint16_t symbols_len, char symbol) {
   if(symbols == NULL)
-    return 0;
-  while(symbols - start_p < symbols_len){
-    if(*symbols++ == symbol)
-      return pos;
-    pos++;
-  }
-  return 0;
+    return -1;
+  char *curr_p = symbols;
+  while(curr_p - symbols < symbols_len)
+    if(*curr_p++ == symbol)
+      return curr_p - symbols - 1;
+  return -1;
 }
 
-unsigned int get_first_token(char *str, unsigned int str_len, char *separators, unsigned int sep_count) {
+uint16_t get_first_token(char *str, uint16_t str_len, char *separators, uint16_t sep_count) {
     if(str == NULL || separators == NULL)
         return 0;
 
     char *sp = str;
-    while(!contains_symbol(separators, sep_count, *sp) && sp - str < str_len) sp++;
+    while(contains_symbol(separators, sep_count, *sp) == -1 && sp - str < str_len) sp++;
 
-    int token_len = sp - str;
-
-    return token_len;
+    return (uint16_t)(sp - str);
 }
 
 uint16_t add_cmd_to_buff(cmd_data_t cmd_data, char *buff) {

@@ -27,7 +27,7 @@ typedef enum {
 typedef enum {
 	NOT_READY,
 	PREPARATION,
-	RUNING,
+	RUNNING,
 	SAVING_DATA,
     ERROR_HANDLER,
 	EXIT
@@ -66,7 +66,6 @@ void handshake_attack_main_task(void *main_task_handle) {
 	char error_buff[100];
 	attack_state_t attack_state = (get_target() == -1) ? NOT_READY : PREPARATION;
 
-	ClearAllButtons();
 	update_title_text("handshake");
 
 	while (1) {
@@ -74,7 +73,7 @@ void handshake_attack_main_task(void *main_task_handle) {
 			attack_state = handshake_not_ready_page(error_buff);
 		} else if (attack_state == PREPARATION) {
 			attack_state = handshake_prepare_page(error_buff);
-		} else if (attack_state == RUNING) {
+		} else if (attack_state == RUNNING) {
 			attack_state = handshake_running_page(error_buff);
 		} else if (attack_state == SAVING_DATA) {
 			attack_state = handshake_saving_data_page(error_buff);
@@ -113,7 +112,7 @@ bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, cha
 	if (save_pcap) {
 		eeprom_read_set(EEPROM_HANDSHAKE_PCAP_ADDR, &file_num);
 		sprintf(file_name, "%s_%lu.pcap", HANDSHAKE_PCAP_FILE_NAME, file_num);
-		sd_setup_error_code = SD_setup(file_name, HANDSHAKE_FOLDER_NAME, 12);
+		sd_setup_error_code = SD_setup_write_from_ringBuff(HANDSHAKE_FOLDER_NAME, file_name, 12);
 		if (sd_setup_error_code != FR_OK) {
 			sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 			return false;
@@ -124,7 +123,7 @@ bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, cha
 	}
 
 	if (!send_cmd_with_check((cmd_data_t){HANDSHAKE_CMD, {get_target(),method,true,timeout,0}}, error_buff, 2000)) {
-		if (save_pcap) SD_unsetup();
+		if (save_pcap) SD_unsetup_write_from_ringBuff();
 		return false;
 	}
 
@@ -158,7 +157,7 @@ data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_b
 
 	eeprom_read_set(file_num_eeprom_addr, &file_num);
 	sprintf(file_name, "%s_%lu%s", HANDSHAKE_FILE_NAME, file_num, file_format);
-	sd_setup_error_code = SD_setup(file_name, HANDSHAKE_FOLDER_NAME, 9);
+	sd_setup_error_code = SD_setup_write_from_ringBuff(HANDSHAKE_FOLDER_NAME, file_name, 9);
 	if (sd_setup_error_code != FR_OK) {
 		sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 		return ret_val;
@@ -167,7 +166,7 @@ data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_b
 	eeprom_write_set(file_num_eeprom_addr, &file_num);
 
 	if (!send_cmd_with_check(get_data_cmd, error_buff, 2000)) {
-		SD_unsetup();
+		SD_unsetup_write_from_ringBuff();
 		return ret_val;
 	}
 
@@ -203,12 +202,12 @@ data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_b
 				ret_val = SAVE_OK;
 			}
 		}
-		SD_unsetup();
+		SD_unsetup_write_from_ringBuff();
 		UART_ringBuffer_mutex_give();
 		return ret_val;
 	}
 
-	SD_unsetup();
+	SD_unsetup_write_from_ringBuff();
 	return ret_val;
 }
 
@@ -270,7 +269,7 @@ attack_state_t handshake_prepare_page(char* error_buff) {
 			if (!handshake_attack_start(timeout, method, save_pcap, error_buff))
 				return ERROR_HANDLER;
 			else
-				return RUNING;
+				return RUNNING;
 		}
 
 		osDelay(100 / portTICK_PERIOD_MS);

@@ -10,7 +10,7 @@
 #include "SETTINGS.h"
 #include "uart_controller.h"
 #include "button.h"
-#include "ring_buffer.h"
+#include "adt.h"
 #include "stdio.h"
 #include "string.h"
 #include "title.h"

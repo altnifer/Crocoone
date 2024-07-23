@@ -178,7 +178,7 @@ void pmkid_attack_parser_task(void * arg) {
 
 	if (!SD_write_error)
 		SD_write_error = !SD_end_write_from_ringBuff();
-	SD_unsetup();
+	SD_unsetup_write_from_ringBuff();
 
 	vTaskDelete(NULL);
 }
@@ -192,14 +192,14 @@ bool pmkid_attack_setup(char *error_buff) {
 
 	sprintf(file_name, "%s_%lu.hc22000", PMKID_FILE_NAME, file_num);
 
-	sd_setup_error_code = SD_setup(file_name, PMKID_FOLDER_NAME, 7);
+	sd_setup_error_code = SD_setup_write_from_ringBuff(PMKID_FOLDER_NAME, file_name, 7);
 	if (sd_setup_error_code != FR_OK) {
 		sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 		return false;
 	}
 
 	if (!send_cmd_with_check((cmd_data_t){PMKID_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
-		SD_unsetup();
+		SD_unsetup_write_from_ringBuff();
 		return false;
 	}
 

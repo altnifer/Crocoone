@@ -30,6 +30,7 @@
 
 #include "SETTINGS.h"
 #include "GFX_FUNCTIONS.h"
+#include "title.h"
 #include "button.h"
 #include "eeprom.h"
 #include "uart_controller.h"
@@ -40,7 +41,7 @@
 #include "deauth_attack.h"
 #include "beacon_attack.h"
 #include "handshake_attack.h"
-#include "title.h"
+#include "bad_usb_attack.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,7 +53,8 @@ static const char *MAIN_MENU_SETS[] = {
 	"PMKID attack",
 	"deauth",
 	"beacon",
-	"handshake"
+	"handshake",
+	"bad usb"
 };
 #define MAX_MAIN_MENU_SET_COUNT (sizeof(MAIN_MENU_SETS) / sizeof(char *))
 
@@ -878,8 +880,10 @@ void StartDefaultTask(void *argument)
 			ESP32_start_deauth_attack((TaskHandle_t *)&defaultTaskHandle);
 		else if (curr_set == 5)
 			ESP32_start_beacon_attack((TaskHandle_t *)&defaultTaskHandle);
-		else
+		else if (curr_set == 6)
 			ESP32_start_handshake_attack((TaskHandle_t *)&defaultTaskHandle);
+		else if (curr_set == 7)
+			USB_attack_start((TaskHandle_t *)&defaultTaskHandle);
 
 		vTaskSuspend(NULL);
 
@@ -888,7 +892,6 @@ void StartDefaultTask(void *argument)
 	}
     osDelay(250);
   }
-
   vTaskDelete(NULL);
   /* USER CODE END 5 */
 }
