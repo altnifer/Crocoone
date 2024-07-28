@@ -109,7 +109,7 @@ void beacon_attack_main_task(void *main_task_handle) {
 		osDelay(100 / portTICK_PERIOD_MS);
 	}
 
-	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
+	send_cmd_without_check((cmd_data_t){STOP_CMD, {}});
 
 	if (exit_with_error) {
 		xSemaphoreTake(SPI2_mutex, portMAX_DELAY);

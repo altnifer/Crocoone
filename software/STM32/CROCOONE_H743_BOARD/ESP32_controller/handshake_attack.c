@@ -14,7 +14,7 @@
 #include "SETTINGS.h"
 #include "button.h"
 #include "title.h"
-#include "eeprom.h"
+#include "flash_controller.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -83,7 +83,7 @@ void handshake_attack_main_task(void *main_task_handle) {
 		update_title_SD_flag(false);
 	}
 
-	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
+	send_cmd_without_check((cmd_data_t){STOP_CMD, {}});
 	pcap_parser_stop();
 	update_title_SD_flag(false);
 
@@ -106,19 +106,18 @@ void handshake_attack_main_task(void *main_task_handle) {
 
 bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, char *error_buff) {
 	FRESULT sd_setup_error_code;
-	uint32_t file_num;
 	char file_name[strlen(HANDSHAKE_PCAP_FILE_NAME) + 18];
 
 	if (save_pcap) {
-		eeprom_read_set(EEPROM_HANDSHAKE_PCAP_ADDR, &file_num);
-		sprintf(file_name, "%s_%lu.pcap", HANDSHAKE_PCAP_FILE_NAME, file_num);
+		file_info_t *file_info_p = flash_read_file_info();
+		sprintf(file_name, "%s_%lu.pcap", HANDSHAKE_PCAP_FILE_NAME, file_info_p->handshake_pcap_num);
 		sd_setup_error_code = SD_setup_write_from_ringBuff(HANDSHAKE_FOLDER_NAME, file_name, 12);
 		if (sd_setup_error_code != FR_OK) {
 			sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 			return false;
 		}
-		file_num++;
-		eeprom_write_set(EEPROM_HANDSHAKE_PCAP_ADDR, &file_num);
+		file_info_p->handshake_pcap_num++;
+		flash_write_file_info();
 		pcap_parser_set_use_sd_flag(true);
 	}
 
@@ -134,7 +133,7 @@ bool handshake_attack_start(uint8_t timeout, uint8_t method, bool save_pcap, cha
 
 bool handshake_attack_stop(char *error_buff) {
 	pcap_parser_stop();
-	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}}, error_buff, 2000))
+	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {}}, error_buff, 2000))
 		return false;
 	return true;
 }
@@ -143,29 +142,23 @@ data_save_res_t handshake_attack_get_data(handshake_data_t data_t, char *error_b
 	const uint16_t SIZEOF_HCCAPX = 394; //see hccapx_serializer component of ESP32 code
 	const uint16_t RECEIVE_TIMEOUT_MS = 500;
 	data_save_res_t ret_val = SAVE_ERROR;
-	FRESULT sd_setup_error_code;
-	uint32_t file_num;
 	char file_name[strlen(HANDSHAKE_FILE_NAME) + 18];
-	uint16_t file_num_eeprom_addr = (data_t == HC22000) ? EEPROM_HANDSHAKE_HC22000_ADDR : EEPROM_HANDSHAKE_HCCAPX_ADDR;
-	cmd_data_t get_data_cmd = {};
-	memcpy(
-			get_data_cmd.cmdName,
-			(data_t == HC22000) ? HC22000_CMD : HCCAPX_CMD,
-			(data_t == HC22000) ? strlen(HC22000_CMD) : strlen(HCCAPX_CMD)
-		  );
-	char *file_format = (data_t == HC22000) ? (".hc22000") : (".hccapx");
 
-	eeprom_read_set(file_num_eeprom_addr, &file_num);
-	sprintf(file_name, "%s_%lu%s", HANDSHAKE_FILE_NAME, file_num, file_format);
-	sd_setup_error_code = SD_setup_write_from_ringBuff(HANDSHAKE_FOLDER_NAME, file_name, 9);
+	file_info_t *file_info_p = flash_read_file_info();
+	uint32_t *file_num_p = (data_t == HC22000) ? (&file_info_p->handshake_hc22000_num) : (&file_info_p->handshake_hccapx_num);
+
+	sprintf(file_name, "%s_%lu%s", HANDSHAKE_FILE_NAME, *file_num_p, (data_t == HC22000) ? (".hc22000") : (".hccapx"));
+	FRESULT sd_setup_error_code = SD_setup_write_from_ringBuff(HANDSHAKE_FOLDER_NAME, file_name, 9);
 	if (sd_setup_error_code != FR_OK) {
 		sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 		return ret_val;
 	}
-	file_num++;
-	eeprom_write_set(file_num_eeprom_addr, &file_num);
 
-	if (!send_cmd_with_check(get_data_cmd, error_buff, 2000)) {
+	(*file_num_p)++;
+	flash_write_file_info();
+
+	cmd_data_t cmd_data = (data_t == HC22000) ? (cmd_data_t){HC22000_CMD, {}} : (cmd_data_t){HCCAPX_CMD, {}};
+	if (!send_cmd_with_check(cmd_data, error_buff, 2000)) {
 		SD_unsetup_write_from_ringBuff();
 		return ret_val;
 	}

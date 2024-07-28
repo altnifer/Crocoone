@@ -10,7 +10,7 @@
 #include "GFX_FUNCTIONS.h"
 #include "SETTINGS.h"
 #include "uart_controller.h"
-#include "eeprom.h"
+#include "flash_controller.h"
 #include "button.h"
 #include "wifi_scan.h"
 #include "title.h"
@@ -169,7 +169,7 @@ void packet_monitor_main_task(void *main_task_handle) {
 	}
 
 	//monitor deinit
-	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
+	send_cmd_without_check((cmd_data_t){STOP_CMD, {}});
 	pcap_parser_stop();
 	update_title_SD_flag(false);
 
@@ -193,28 +193,27 @@ void packet_monitor_main_task(void *main_task_handle) {
 
 bool packet_monitor_restart(bool use_sd, uint8_t ch, uint8_t filter_mask, bool use_target, char *error_buff) {
 	FRESULT sd_setup_error_code;
-	uint32_t file_num;
 	char file_name[strlen(MONITOR_FILE_NAME) + 18];
 
 	pcap_parser_stop();
 	osDelay(500 / portTICK_PERIOD_MS);
 
-	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
+	if (!send_cmd_with_check((cmd_data_t){STOP_CMD, {}}, error_buff, 2000)) {
 		return false;
 	}
 
 	pcap_parser_set_use_sd_flag(false);
 
 	if (use_sd) {
-		eeprom_read_set(EEPROM_MONITOR_PCAP_ADDR, &file_num);
-		sprintf(file_name, "%s_%lu.pcap", MONITOR_FILE_NAME, file_num);
+		file_info_t *file_info_p = flash_read_file_info();
+		sprintf(file_name, "%s_%lu.pcap", MONITOR_FILE_NAME, file_info_p->monitor_pcap_num);
 		sd_setup_error_code = SD_setup_write_from_ringBuff(MONITOR_FOLDER_NAME, file_name, 12);
 		if (sd_setup_error_code != FR_OK) {
 			sprintf(error_buff, "SD setup error with code %d", sd_setup_error_code);
 			return false;
 		}
-		file_num++;
-		eeprom_write_set(EEPROM_MONITOR_PCAP_ADDR, &file_num);
+		file_info_p->monitor_pcap_num++;
+		flash_write_file_info();
 		pcap_parser_set_use_sd_flag(true);
 	}
 

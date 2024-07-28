@@ -9,7 +9,7 @@
 #include "GFX_FUNCTIONS.h"
 #include "button.h"
 #include "uart_controller.h"
-#include "eeprom.h"
+#include "flash_controller.h"
 #include "SD_card.h"
 #include "string.h"
 #include "stdio.h"
@@ -185,12 +185,11 @@ void pmkid_attack_parser_task(void * arg) {
 
 bool pmkid_attack_setup(char *error_buff) {
 	FRESULT sd_setup_error_code;
-	uint32_t file_num;
 	char file_name[strlen(PMKID_FILE_NAME) + 21];
 
-	eeprom_read_set(EEPROM_PMKID_ADDR, &file_num);
+	file_info_t *file_info_p = flash_read_file_info();
 
-	sprintf(file_name, "%s_%lu.hc22000", PMKID_FILE_NAME, file_num);
+	sprintf(file_name, "%s_%lu.hc22000", PMKID_FILE_NAME, file_info_p->pmkid_file_num);
 
 	sd_setup_error_code = SD_setup_write_from_ringBuff(PMKID_FOLDER_NAME, file_name, 7);
 	if (sd_setup_error_code != FR_OK) {
@@ -198,13 +197,13 @@ bool pmkid_attack_setup(char *error_buff) {
 		return false;
 	}
 
-	if (!send_cmd_with_check((cmd_data_t){PMKID_CMD, {0,0,0,0,0}}, error_buff, 2000)) {
+	if (!send_cmd_with_check((cmd_data_t){PMKID_CMD, {}}, error_buff, 2000)) {
 		SD_unsetup_write_from_ringBuff();
 		return false;
 	}
 
-	file_num++;
-	eeprom_write_set(EEPROM_PMKID_ADDR, &file_num);
+	file_info_p->pmkid_file_num++;
+	flash_write_file_info();
 
 	memset(current_ssid, 0, 33);
 	captured_pmkid_count = 0;
@@ -216,7 +215,7 @@ bool pmkid_attack_setup(char *error_buff) {
 
 void pmkid_attack_unsetup() {
 	pmkid_task_flag = false;
-	send_cmd_without_check((cmd_data_t){STOP_CMD, {0,0,0,0,0}});
+	send_cmd_without_check((cmd_data_t){STOP_CMD, {}});
 }
 
 static void darw_running_page(char * ssid_name, uint16_t pmkid_count, bool full_refresh) {

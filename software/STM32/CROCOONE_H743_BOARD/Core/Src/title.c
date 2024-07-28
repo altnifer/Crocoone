@@ -70,6 +70,7 @@ void draw_title_task(void *args) {
 
 void refresh_title() {
 	if (refresh_title_text) {
+		fillRect(1, 1, MAX_CHAR_IN_TITLE * 7, 10, MAIN_BG_COLOR);
 		ST7735_WriteString(1, 1, title, Font_7x10, MAIN_TXT_COLOR, MAIN_BG_COLOR);
 		refresh_title_text = false;
 	}
